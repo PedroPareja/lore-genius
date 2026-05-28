@@ -1,73 +1,95 @@
-# React + TypeScript + Vite
+# LoreGenius
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A browser-based editor for creating, editing, and managing [SillyTavern](https://github.com/SillyTavern/SillyTavern)-compatible lorebooks, with AI-assisted writing capabilities.
 
-Currently, two official plugins are available:
+Fully client-side — no backend, no accounts. All data lives in your browser and your exported JSON files.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Features
 
-## React Compiler
+- **Full lorebook editor** — all SillyTavern entry fields supported (keys, content, position, role, group, probability, sticky, cooldown, and more)
+- **Import/export** — import existing SillyTavern lorebook JSON; export valid files that work in SillyTavern without modification
+- **AI-assisted writing** — generate, edit, or expand entry content using any OpenAI-compatible endpoint (LM Studio, Ollama, OpenAI, or custom)
+- **Streaming responses** — AI text streams in real-time; accept, regenerate, or discard results
+- **Token counting** — accurate token estimation using GPT tokenizer with character-heuristic fallback
+- **Dark-first UI** — dark theme by default with light mode toggle
+- **Keyboard shortcuts** — `Ctrl+S` save, `Ctrl+N` new entry, `Ctrl+G` AI panel, and more
+- **Responsive layout** — works on desktop and tablet; mobile-friendly sidebar/panel flow
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Tech Stack
 
-## Expanding the ESLint configuration
+| Layer | Technology |
+|---|---|
+| Framework | React 19 + TypeScript |
+| Build | Vite |
+| Styling | Tailwind CSS 4 |
+| UI Components | shadcn/ui (Radix primitives) |
+| State | Zustand |
+| Validation | Zod |
+| AI Client | OpenAI SDK (browser-side) |
+| Routing | React Router v7 |
+| Token Estimation | gpt-tokenizer |
+| Icons | Lucide React |
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Getting Started
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+```bash
+# Install dependencies
+pnpm install
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+# Start dev server
+pnpm dev
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# Type check
+pnpm typecheck
+
+# Lint
+pnpm lint
+
+# Format
+pnpm format
+
+# Production build
+pnpm build
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Project Structure
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
 ```
+src/
+├── components/
+│   ├── ai/          # AI assistant panel, preview dialog, result display
+│   ├── editor/      # Entry editor, keyword input, content editor, advanced options
+│   ├── layout/      # App shell, sidebar, top bar, theme toggle
+│   ├── settings/    # Settings page
+│   └── ui/          # shadcn/ui primitives (button, input, dialog, etc.)
+├── hooks/           # useKeyboardShortcuts, useAutoSave, useTheme
+├── lib/             # Utilities: file I/O, tokenizer, defaults, validation
+├── stores/          # Zustand stores: lorebook, editor, settings, AI
+├── types/           # TypeScript types: lorebook, AI config, settings
+└── styles/          # globals.css (Tailwind + theme tokens)
+```
+
+## AI Providers
+
+LoreGenius works with any OpenAI-compatible API:
+
+| Provider | Endpoint | Auth |
+|---|---|---|
+| LM Studio | `http://localhost:1234/v1` | None |
+| Ollama | `http://localhost:11434/v1` | None |
+| OpenAI | `https://api.openai.com/v1` | API key required |
+| Custom | User-defined | Optional |
+
+Configure your provider in **Settings**. The app auto-detects available models and tests connectivity before generating.
+
+## Data & Privacy
+
+- No backend server — all processing happens in your browser
+- AI API calls go directly from your browser to your configured endpoint
+- API keys are stored in `localStorage` and never sent anywhere except the configured endpoint
+- Lorebook data is only exported when you explicitly save; auto-save stores drafts in `localStorage`
+
+## Documentation
+
+- [`DESIGN.md`](./DESIGN.md) — UI/UX design document (color system, layouts, interactions)
+- [`SPECS.md`](./SPECS.md) — Technical specification (data models, state, AI integration, validation)
