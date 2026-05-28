@@ -65,7 +65,7 @@ export function useKeyboardShortcuts() {
             if (aiPanelOpen) {
               closeAIPanel()
             } else {
-              openAIPanel("write")
+              openAIPanel()
             }
           },
         },
@@ -83,7 +83,7 @@ export function useKeyboardShortcuts() {
           action: () => {
             e.preventDefault()
             if (selectedEntryUid !== null) {
-              openAIPanel("write")
+              openAIPanel()
             }
           },
         },

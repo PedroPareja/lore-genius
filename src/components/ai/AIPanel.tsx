@@ -1,10 +1,8 @@
 import { useState, useCallback } from "react"
 import { X, Sparkles, Square } from "lucide-react"
 import { Button, Textarea } from "@/components/ui"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui"
 import { useAIStore, useLorebookStore, useEditorStore, useSettingsStore } from "@/stores"
 import { AIPreviewDialog } from "./AIPreviewDialog"
-import type { AIMode } from "@/types/ai"
 
 interface AIPanelProps {
   open: boolean
@@ -21,7 +19,6 @@ export function AIPanel({ open, onClose }: AIPanelProps) {
   const { settings } = useSettingsStore()
 
   const [customInstructions, setCustomInstructions] = useState("")
-  const [mode, setMode] = useState<AIMode>("write")
   
   const [showPreview, setShowPreview] = useState(false)
 
@@ -155,7 +152,6 @@ Keep it under 200 words unless the subject requires more detail.`
       <AIPreviewDialog
         open={showPreview}
         onClose={handlePreviewClose}
-        mode="write"
       />
     </div>
   )
