@@ -113,17 +113,9 @@ export function EntryEditor() {
           />
 
           <div className="flex flex-wrap gap-2 pt-2">
-            <Button variant="secondary" onClick={() => openAIPanel("write")}>
+            <Button variant="secondary" onClick={() => openAIPanel()}>
               <Sparkles className="h-4 w-4 mr-2" />
               AI Write
-            </Button>
-            <Button variant="secondary" onClick={() => openAIPanel("edit")}>
-              <Sparkles className="h-4 w-4 mr-2" />
-              AI Edit
-            </Button>
-            <Button variant="secondary" onClick={() => openAIPanel("expand")}>
-              <Sparkles className="h-4 w-4 mr-2" />
-              AI Expand
             </Button>
           </div>
 

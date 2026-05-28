@@ -5,7 +5,7 @@ export type AIProvider =
   | "openai"
   | "custom"
 
-export type AIMode = "write" | "edit" | "expand" | "chat"
+export type AIMode = "write" | "expand"
 
 export interface AIConfig {
   provider: AIProvider

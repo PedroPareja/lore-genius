@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react"
+import { useState, useCallback } from "react"
 import { X, Sparkles, Square } from "lucide-react"
 import { Button, Textarea } from "@/components/ui"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui"
@@ -13,7 +13,7 @@ interface AIPanelProps {
 
 export function AIPanel({ open, onClose }: AIPanelProps) {
   const { getEntry } = useLorebookStore()
-  const { selectedEntryUid, aiPanelMode } = useEditorStore()
+  const { selectedEntryUid } = useEditorStore()
   const isGenerating = useAIStore((s) => s.isGenerating)
   const isThinking = useAIStore((s) => s.isThinking)
   const streamingText = useAIStore((s) => s.streamingText)
@@ -21,15 +21,14 @@ export function AIPanel({ open, onClose }: AIPanelProps) {
   const { settings } = useSettingsStore()
 
   const [customInstructions, setCustomInstructions] = useState("")
-  const [mode, setMode] = useState<AIMode>(aiPanelMode)
+  const [mode, setMode] = useState<AIMode>("write")
+  
   const [showPreview, setShowPreview] = useState(false)
 
   const entry = selectedEntryUid !== null ? getEntry(selectedEntryUid) : null
   const error = useAIStore((s) => s.error)
 
-  useEffect(() => {
-    setMode(aiPanelMode)
-  }, [aiPanelMode])
+  
 
   const buildPrompt = () => {
     if (!entry) return ""
@@ -37,11 +36,10 @@ export function AIPanel({ open, onClose }: AIPanelProps) {
     const baseContext = `Title/Comment: ${entry.comment}
 Primary Keywords: ${entry.key.join(", ")}
 Secondary Keywords: ${entry.keysecondary.join(", ")}
-Group: ${entry.group}`
+Group: ${entry.group}
+${entry.content ? `Current Content:\n${entry.content}` : ""}`
 
-    switch (mode) {
-      case "write":
-        return `Write a lorebook entry for the following:
+    return `Write a lorebook entry for the following:
 
 ${baseContext}
 
@@ -50,41 +48,6 @@ ${customInstructions ? `Additional instructions: ${customInstructions}` : ""}
 Write concise, factual lore content suitable for injection into an AI roleplay prompt.
 Focus on key facts, relationships, and distinctive details.
 Keep it under 200 words unless the subject requires more detail.`
-
-      case "edit":
-        return `Rewrite and improve the following lorebook entry:
-
-Title: ${entry.comment}
-Keywords: ${entry.key.join(", ")}
-
-Current content:
-${entry.content}
-
-${customInstructions ? `Additional instructions: ${customInstructions}` : ""}
-
-Improve clarity, conciseness, and detail. Maintain the same factual content.
-Return only the improved text, no explanations.`
-
-      case "expand":
-        return `Expand the following lorebook entry with additional detail:
-
-Title: ${entry.comment}
-Keywords: ${entry.key.join(", ")}
-
-Current content:
-${entry.content}
-
-${customInstructions ? `Additional instructions: ${customInstructions}` : ""}
-
-Add relevant details while preserving all existing information.
-Return only the expanded text, no explanations.`
-
-      case "chat":
-        return customInstructions || "Continue the conversation about this lore entry."
-
-      default:
-        return ""
-    }
   }
 
   const handleGenerate = async () => {
@@ -99,7 +62,7 @@ Return only the expanded text, no explanations.`
         entryKeysecondary: entry.keysecondary,
         entryGroup: entry.group,
         entryContent: entry.content,
-      }, mode)
+      }, "write")
     } catch {
       // Error is already stored in aiStore and displayed below
     }
@@ -127,26 +90,14 @@ Return only the expanded text, no explanations.`
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         <div className="space-y-2">
-          <label className="text-sm font-medium text-text-primary">Mode</label>
-          <Select value={mode} onValueChange={(v) => setMode(v as AIMode)}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="write">Write</SelectItem>
-              <SelectItem value="edit">Edit</SelectItem>
-              <SelectItem value="expand">Expand</SelectItem>
-              <SelectItem value="chat">Chat</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-2">
           <label className="text-sm font-medium text-text-primary">Context (auto-filled)</label>
           <div className="p-3 border border-border rounded-md bg-bg-input text-sm text-text-secondary space-y-1">
             <p>Entry: "{entry?.comment || "No entry selected"}"</p>
             {entry && entry.key.length > 0 && (
               <p>Keys: {entry.key.join(", ")}</p>
+            )}
+            {entry?.content && (
+              <p className="mt-2 text-xs text-text-secondary/70">Current: {entry.content.slice(0, 100)}{entry.content.length > 100 ? "..." : ""}</p>
             )}
           </div>
         </div>
@@ -156,7 +107,7 @@ Return only the expanded text, no explanations.`
           <Textarea
             value={customInstructions}
             onChange={(e) => setCustomInstructions(e.target.value)}
-            placeholder={mode === "write" ? "e.g., Focus on corporate history..." : "Additional guidance..."}
+            placeholder="e.g., Focus on corporate history..."
             className="min-h-[100px]"
           />
         </div>
@@ -204,7 +155,7 @@ Return only the expanded text, no explanations.`
       <AIPreviewDialog
         open={showPreview}
         onClose={handlePreviewClose}
-        mode={mode}
+        mode="write"
       />
     </div>
   )

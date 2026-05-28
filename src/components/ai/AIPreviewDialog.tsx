@@ -2,15 +2,13 @@ import { Sparkles, Brain } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui"
 import { useAIStore, useLorebookStore, useEditorStore } from "@/stores"
-import type { AIMode } from "@/types/ai"
 
 interface AIPreviewDialogProps {
   open: boolean
   onClose: () => void
-  mode: AIMode
 }
 
-export function AIPreviewDialog({ open, onClose, mode }: AIPreviewDialogProps) {
+export function AIPreviewDialog({ open, onClose }: AIPreviewDialogProps) {
   const streamingText = useAIStore((s) => s.streamingText)
   const isGenerating = useAIStore((s) => s.isGenerating)
   const isThinking = useAIStore((s) => s.isThinking)
@@ -18,25 +16,28 @@ export function AIPreviewDialog({ open, onClose, mode }: AIPreviewDialogProps) {
   const { updateEntry } = useLorebookStore()
   const selectedEntryUid = useEditorStore((s) => s.selectedEntryUid)
 
-  const handleAccept = () => {
+  const handleReplace = () => {
+    if (selectedEntryUid === null || !streamingText) return
+
+    updateEntry(selectedEntryUid, { content: streamingText })
+    clearResult()
+    onClose()
+  }
+
+  const handleExtend = () => {
     if (selectedEntryUid === null || !streamingText) return
 
     const entry = useLorebookStore.getState().getEntry(selectedEntryUid)
     if (!entry) return
 
-    let newContent: string
-    if (mode === "write" || mode === "chat") {
-      newContent = streamingText
-    } else {
-      newContent = entry.content ? `${entry.content}\n\n${streamingText}` : streamingText
-    }
-
+    const newContent = entry.content ? `${entry.content}\n\n${streamingText}` : streamingText
     updateEntry(selectedEntryUid, { content: newContent })
     clearResult()
     onClose()
   }
 
-  const handleReject = () => {
+  const handleAbort = () => {
+    useAIStore.getState().stopGeneration()
     clearResult()
     onClose()
   }
@@ -70,11 +71,14 @@ export function AIPreviewDialog({ open, onClose, mode }: AIPreviewDialogProps) {
         </div>
 
         <div className="flex justify-end gap-2">
-          <Button variant="outline" onClick={handleReject}>
-            Reject
+          <Button variant="outline" onClick={handleAbort}>
+            Abort
           </Button>
-          <Button onClick={handleAccept} disabled={!streamingText || isGenerating}>
-            Accept
+          <Button variant="outline" onClick={handleExtend} disabled={!streamingText || isGenerating}>
+            Extend
+          </Button>
+          <Button onClick={handleReplace} disabled={!streamingText || isGenerating}>
+            Replace
           </Button>
         </div>
       </DialogContent>

@@ -1,5 +1,4 @@
 import { create } from "zustand"
-import { AIMode } from "@/types/ai"
 
 export type FilterStatus = "all" | "enabled" | "disabled" | "constant"
 export type SortOption = "order" | "name" | "group" | "modified"
@@ -7,14 +6,13 @@ export type SortOption = "order" | "name" | "group" | "modified"
 interface EditorState {
   selectedEntryUid: number | null
   aiPanelOpen: boolean
-  aiPanelMode: AIMode
   advancedOptionsExpanded: boolean
   searchQuery: string
   filterGroup: string | null
   filterStatus: FilterStatus
   sortBy: SortOption
   selectEntry: (uid: number | null) => void
-  openAIPanel: (mode: AIMode) => void
+  openAIPanel: () => void
   closeAIPanel: () => void
   toggleAdvanced: () => void
   setSearch: (query: string) => void
@@ -25,7 +23,6 @@ interface EditorState {
 export const useEditorStore = create<EditorState>((set) => ({
   selectedEntryUid: null,
   aiPanelOpen: false,
-  aiPanelMode: "write",
   advancedOptionsExpanded: false,
   searchQuery: "",
   filterGroup: null,
@@ -36,8 +33,8 @@ export const useEditorStore = create<EditorState>((set) => ({
     set({ selectedEntryUid: uid, advancedOptionsExpanded: false })
   },
 
-  openAIPanel: (mode) => {
-    set({ aiPanelOpen: true, aiPanelMode: mode })
+  openAIPanel: () => {
+    set({ aiPanelOpen: true })
   },
 
   closeAIPanel: () => {
