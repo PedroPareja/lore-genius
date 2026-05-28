@@ -14,6 +14,15 @@ export function useKeyboardShortcuts() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement
+      const isInput =
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable
+
+      // Allow Escape to work everywhere; block other shortcuts when typing
+      if (isInput && e.key !== "Escape") return
+
       const ctrl = e.ctrlKey || e.metaKey
       const shift = e.shiftKey
 
@@ -99,18 +108,6 @@ export function useKeyboardShortcuts() {
           },
         },
         {
-          key: "ArrowUp",
-          action: () => {
-            e.preventDefault()
-          },
-        },
-        {
-          key: "ArrowDown",
-          action: () => {
-            e.preventDefault()
-          },
-        },
-        {
           key: "Escape",
           action: () => {
             if (aiPanelOpen) {
@@ -126,12 +123,6 @@ export function useKeyboardShortcuts() {
         const shiftMatch = !!shortcut.shift === shift
 
         if (keyMatch && ctrlMatch && shiftMatch) {
-          shortcut.action()
-          break
-        } else if (keyMatch && ctrlMatch && !shortcut.shift) {
-          shortcut.action()
-          break
-        } else if (keyMatch && !shortcut.ctrl && !shift) {
           shortcut.action()
           break
         }

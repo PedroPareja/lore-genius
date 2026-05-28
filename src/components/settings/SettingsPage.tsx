@@ -298,7 +298,8 @@ export function SettingsPage() {
               variant="destructive"
               onClick={() => {
                 if (confirm("Clear all app data? This will remove all settings and draft data.")) {
-                  localStorage.clear()
+                  localStorage.removeItem("loregenius-settings")
+                  localStorage.removeItem("lorebook-draft")
                   window.location.reload()
                 }
               }}

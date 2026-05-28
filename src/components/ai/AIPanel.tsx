@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { X, Sparkles, Square } from "lucide-react"
 import { Button, Textarea } from "@/components/ui"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui"
 import { useAIStore, useLorebookStore, useEditorStore, useSettingsStore } from "@/stores"
+import { AIPreviewDialog } from "./AIPreviewDialog"
 import type { AIMode } from "@/types/ai"
 
 interface AIPanelProps {
@@ -11,17 +12,20 @@ interface AIPanelProps {
 }
 
 export function AIPanel({ open, onClose }: AIPanelProps) {
-  const { getEntry, updateEntry } = useLorebookStore()
+  const { getEntry } = useLorebookStore()
   const { selectedEntryUid, aiPanelMode } = useEditorStore()
   const isGenerating = useAIStore((s) => s.isGenerating)
+  const isThinking = useAIStore((s) => s.isThinking)
   const streamingText = useAIStore((s) => s.streamingText)
-  const { generate, stopGeneration, clearResult } = useAIStore()
+  const { generate, stopGeneration } = useAIStore()
   const { settings } = useSettingsStore()
 
   const [customInstructions, setCustomInstructions] = useState("")
   const [mode, setMode] = useState<AIMode>(aiPanelMode)
+  const [showPreview, setShowPreview] = useState(false)
 
   const entry = selectedEntryUid !== null ? getEntry(selectedEntryUid) : null
+  const error = useAIStore((s) => s.error)
 
   useEffect(() => {
     setMode(aiPanelMode)
@@ -87,28 +91,25 @@ Return only the expanded text, no explanations.`
     if (!entry || !settings.ai.model) return
 
     const prompt = buildPrompt()
-    await generate(prompt, {
-      entryComment: entry.comment,
-      entryKeys: entry.key,
-      entryKeysecondary: entry.keysecondary,
-      entryGroup: entry.group,
-      entryContent: entry.content,
-    }, mode)
-  }
-
-  const handleAccept = () => {
-    const contentToApply = useAIStore.getState().streamingText
-    if (selectedEntryUid !== null && contentToApply) {
-      updateEntry(selectedEntryUid, { content: contentToApply })
+    setShowPreview(true)
+    try {
+      await generate(prompt, {
+        entryComment: entry.comment,
+        entryKeys: entry.key,
+        entryKeysecondary: entry.keysecondary,
+        entryGroup: entry.group,
+        entryContent: entry.content,
+      }, mode)
+    } catch {
+      // Error is already stored in aiStore and displayed below
     }
-    clearResult()
-    onClose()
   }
 
-  const handleDiscard = () => {
-    clearResult()
-    onClose()
-  }
+  const handlePreviewClose = useCallback(() => {
+    if (!isGenerating) {
+      setShowPreview(false)
+    }
+  }, [isGenerating])
 
   if (!open) return null
 
@@ -178,23 +179,33 @@ Return only the expanded text, no explanations.`
           )}
         </Button>
 
-        {streamingText && (
+        {error && (
+          <div className="p-3 rounded-md bg-danger/10 text-danger text-sm">
+            {error}
+          </div>
+        )}
+
+        {(streamingText || isGenerating) && (
           <div className="space-y-4 pt-4 border-t border-border">
-            <label className="text-sm font-medium text-text-primary">Result</label>
+            <label className="text-sm font-medium text-text-primary">
+              {isThinking ? "Thinking..." : "Result"}
+            </label>
             <div className="min-h-[150px] p-4 border border-border rounded-md bg-bg-input">
-              <p className="text-sm text-text-primary whitespace-pre-wrap">{streamingText}</p>
-            </div>
-            <div className="flex gap-2">
-              <Button onClick={handleAccept} className="flex-1">
-                Accept
-              </Button>
-              <Button variant="outline" onClick={handleDiscard}>
-                Discard
-              </Button>
+              {streamingText ? (
+                <p className="text-sm text-text-primary whitespace-pre-wrap">{streamingText}</p>
+              ) : (
+                <span className="animate-pulse text-text-secondary">Generating...</span>
+              )}
             </div>
           </div>
         )}
       </div>
+
+      <AIPreviewDialog
+        open={showPreview}
+        onClose={handlePreviewClose}
+        mode={mode}
+      />
     </div>
   )
 }

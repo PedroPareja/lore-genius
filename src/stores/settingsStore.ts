@@ -63,7 +63,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
 
   resetToDefaults: () => {
-    set({ settings: DEFAULT_SETTINGS })
+    set({ settings: { ...DEFAULT_SETTINGS, ai: { ...DEFAULT_AI_CONFIG } } })
     get().saveToStorage()
   },
 

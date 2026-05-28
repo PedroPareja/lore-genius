@@ -1,3 +1,4 @@
+import { useEffect } from "react"
 import { BrowserRouter, Routes, Route } from "react-router-dom"
 import { AppShell } from "@/components/layout"
 import { EntryEditor } from "@/components/editor"
@@ -28,9 +29,9 @@ function AppContent() {
 }
 
 export function App() {
-  const loadFromStorage = useSettingsStore.getState().loadFromStorage
-
-  loadFromStorage()
+  useEffect(() => {
+    useSettingsStore.getState().loadFromStorage()
+  }, [])
 
   return (
     <TooltipProvider>
