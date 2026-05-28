@@ -1,4 +1,3 @@
-import { useState } from "react"
 import { Sparkles, Copy, Trash2, ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui"
 import { useLorebookStore, useEditorStore } from "@/stores"
@@ -8,8 +7,7 @@ import { AdvancedOptions } from "./AdvancedOptions"
 
 export function EntryEditor() {
   const { getEntry, updateEntry, deleteEntry, duplicateEntry } = useLorebookStore()
-  const { selectedEntryUid, selectEntry, openAIPanel } = useEditorStore()
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const { selectedEntryUid, selectEntry, openAIPanel, showDeleteConfirm, setShowDeleteConfirm } = useEditorStore()
 
   const entry = selectedEntryUid !== null ? getEntry(selectedEntryUid) : null
 

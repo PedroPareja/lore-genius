@@ -10,7 +10,7 @@ interface ShortcutAction {
 
 export function useKeyboardShortcuts() {
   const { addEntry, deleteEntry, duplicateEntry, lorebook } = useLorebookStore()
-  const { selectedEntryUid, openAIPanel, selectEntry, aiPanelOpen, closeAIPanel } = useEditorStore()
+  const { selectedEntryUid, openAIPanel, selectEntry, aiPanelOpen, closeAIPanel, setShowDeleteConfirm } = useEditorStore()
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -90,9 +90,8 @@ export function useKeyboardShortcuts() {
         {
           key: "Delete",
           action: () => {
-            if (selectedEntryUid !== null && lorebook) {
-              deleteEntry(selectedEntryUid)
-              selectEntry(null)
+            if (selectedEntryUid !== null) {
+              setShowDeleteConfirm(true)
             }
           },
         },
@@ -131,5 +130,5 @@ export function useKeyboardShortcuts() {
 
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [selectedEntryUid, aiPanelOpen, lorebook, addEntry, deleteEntry, duplicateEntry, selectEntry, openAIPanel, closeAIPanel])
+  }, [selectedEntryUid, aiPanelOpen, lorebook, addEntry, deleteEntry, duplicateEntry, selectEntry, openAIPanel, closeAIPanel, setShowDeleteConfirm])
 }

@@ -11,6 +11,7 @@ interface EditorState {
   filterGroup: string | null
   filterStatus: FilterStatus
   sortBy: SortOption
+  showDeleteConfirm: boolean
   selectEntry: (uid: number | null) => void
   openAIPanel: () => void
   closeAIPanel: () => void
@@ -18,6 +19,7 @@ interface EditorState {
   setSearch: (query: string) => void
   setFilter: (group: string | null, status: FilterStatus) => void
   setSort: (sortBy: SortOption) => void
+  setShowDeleteConfirm: (show: boolean) => void
 }
 
 export const useEditorStore = create<EditorState>((set) => ({
@@ -28,6 +30,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   filterGroup: null,
   filterStatus: "all",
   sortBy: "order",
+  showDeleteConfirm: false,
 
   selectEntry: (uid) => {
     set({ selectedEntryUid: uid, advancedOptionsExpanded: false })
@@ -55,5 +58,9 @@ export const useEditorStore = create<EditorState>((set) => ({
 
   setSort: (sortBy) => {
     set({ sortBy })
+  },
+
+  setShowDeleteConfirm: (show) => {
+    set({ showDeleteConfirm: show })
   },
 }))
