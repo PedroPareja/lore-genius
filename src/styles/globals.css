@@ -1,0 +1,85 @@
+@import "tailwindcss";
+
+:root {
+  --bg-primary: #f8f9fc;
+  --bg-surface: #ffffff;
+  --bg-elevated: #f0f1f5;
+  --bg-input: #e8e9ef;
+  --border: #d4d6e0;
+  --text-primary: #1a1d27;
+  --text-secondary: #5c6078;
+  --accent: #6c5ce7;
+  --accent-hover: #5a4bd6;
+  --success: #00a884;
+  --warning: #e5a800;
+  --danger: #d64534;
+  --ai-glow: #7c6fe0;
+}
+
+.dark {
+  --bg-primary: #0f1117;
+  --bg-surface: #1a1d27;
+  --bg-elevated: #242836;
+  --bg-input: #2a2e3b;
+  --border: #2e3348;
+  --text-primary: #e4e6f0;
+  --text-secondary: #9499b0;
+  --accent: #6c5ce7;
+  --accent-hover: #7f71ed;
+  --success: #00b894;
+  --warning: #fdcb6e;
+  --danger: #e17055;
+  --ai-glow: #a29bfe;
+}
+
+@theme inline {
+  --color-bg-primary: var(--bg-primary);
+  --color-bg-surface: var(--bg-surface);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-bg-input: var(--bg-input);
+  --color-border: var(--border);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-ai-glow: var(--ai-glow);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background-color: var(--accent);
+  color: white;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-surface);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
