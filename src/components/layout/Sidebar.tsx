@@ -1,7 +1,9 @@
 import { useState, useMemo } from "react"
 import { Search, Filter, Plus, GripVertical } from "lucide-react"
 import { Button, Input, Badge } from "@/components/ui"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useLorebookStore, useEditorStore } from "@/stores"
+import type { FilterStatus } from "@/stores/editorStore"
 import type { LorebookEntry } from "@/types/lorebook"
 
 interface EntryCardProps {
@@ -49,7 +51,7 @@ function EntryCard({ entry, isSelected, onSelect, onDoubleClick }: EntryCardProp
 
 export function Sidebar() {
   const { lorebook, getEntries, addEntry } = useLorebookStore()
-  const { searchQuery, setSearch, filterStatus, selectedEntryUid, selectEntry } = useEditorStore()
+  const { searchQuery, setSearch, filterStatus, setFilter, selectedEntryUid, selectEntry } = useEditorStore()
   const [showFilters, setShowFilters] = useState(false)
 
   const entries = useMemo(() => {
@@ -108,6 +110,22 @@ export function Sidebar() {
           <Filter className="h-4 w-4 mr-2" />
           Filter
         </Button>
+        {showFilters && (
+          <Select
+            value={filterStatus}
+            onValueChange={(value: FilterStatus) => setFilter(null, value)}
+          >
+            <SelectTrigger className="h-8 text-xs">
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All entries</SelectItem>
+              <SelectItem value="enabled">Enabled</SelectItem>
+              <SelectItem value="disabled">Disabled</SelectItem>
+              <SelectItem value="constant">Constant</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto p-2">
