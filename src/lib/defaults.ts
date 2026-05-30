@@ -15,7 +15,7 @@ export const ENTRY_DEFAULTS: LorebookEntry = {
   probability: 100,
   useProbability: false,
   depth: 4,
-  group: "default",
+  group: "",
   scanDepth: null,
   caseSensitive: false,
   matchWholeWords: false,
