@@ -25,7 +25,7 @@ interface EditorState {
 export const useEditorStore = create<EditorState>((set) => ({
   selectedEntryUid: null,
   aiPanelOpen: false,
-  advancedOptionsExpanded: false,
+  advancedOptionsExpanded: true,
   searchQuery: "",
   filterGroup: null,
   filterStatus: "all",
@@ -33,7 +33,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   showDeleteConfirm: false,
 
   selectEntry: (uid) => {
-    set({ selectedEntryUid: uid, advancedOptionsExpanded: false })
+    set({ selectedEntryUid: uid })
   },
 
   openAIPanel: () => {
