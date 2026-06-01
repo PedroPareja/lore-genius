@@ -2,11 +2,32 @@ import { ChevronDown, ChevronUp } from "lucide-react"
 import { Button, Input, Label, Switch, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui"
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui"
 import { useEditorStore } from "@/stores"
-import type { LorebookEntry, EntryPosition, EntryRole } from "@/types/lorebook"
+import type { LorebookEntry, EntryPosition } from "@/types/lorebook"
 
 interface AdvancedOptionsProps {
   entry: LorebookEntry
   onUpdate: (fields: Partial<LorebookEntry>) => void
+}
+
+function NullableBoolSelect({ value, onChange, label }: { value: boolean | null; onChange: (v: boolean | null) => void; label: string }) {
+  return (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <Select
+        value={value === null ? "null" : value ? "true" : "false"}
+        onValueChange={(v) => onChange(v === "null" ? null : v === "true")}
+      >
+        <SelectTrigger>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="null">Use global</SelectItem>
+          <SelectItem value="true">Yes</SelectItem>
+          <SelectItem value="false">No</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  )
 }
 
 export function AdvancedOptions({ entry, onUpdate }: AdvancedOptionsProps) {
@@ -61,13 +82,14 @@ export function AdvancedOptions({ entry, onUpdate }: AdvancedOptionsProps) {
           <div className="space-y-2">
             <Label>Role</Label>
             <Select
-              value={String(entry.role)}
-              onValueChange={(v) => onUpdate({ role: parseInt(v) as EntryRole })}
+              value={entry.role === null ? "null" : String(entry.role)}
+              onValueChange={(v) => onUpdate({ role: v === "null" ? null : parseInt(v) })}
             >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="null">Default (System)</SelectItem>
                 <SelectItem value="0">System</SelectItem>
                 <SelectItem value="1">User</SelectItem>
                 <SelectItem value="2">Assistant</SelectItem>
@@ -121,21 +143,23 @@ export function AdvancedOptions({ entry, onUpdate }: AdvancedOptionsProps) {
             <Label>Exclude Recursion</Label>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Switch
-              checked={entry.caseSensitive}
-              onCheckedChange={(checked) => onUpdate({ caseSensitive: checked })}
-            />
-            <Label>Case Sensitive</Label>
-          </div>
+          <NullableBoolSelect
+            label="Case Sensitive"
+            value={entry.caseSensitive}
+            onChange={(v) => onUpdate({ caseSensitive: v })}
+          />
 
-          <div className="flex items-center gap-2">
-            <Switch
-              checked={entry.matchWholeWords}
-              onCheckedChange={(checked) => onUpdate({ matchWholeWords: checked })}
-            />
-            <Label>Match Whole Words</Label>
-          </div>
+          <NullableBoolSelect
+            label="Match Whole Words"
+            value={entry.matchWholeWords}
+            onChange={(v) => onUpdate({ matchWholeWords: v })}
+          />
+
+          <NullableBoolSelect
+            label="Use Group Scoring"
+            value={entry.useGroupScoring}
+            onChange={(v) => onUpdate({ useGroupScoring: v })}
+          />
 
           <div className="flex items-center gap-2">
             <Switch

@@ -5,24 +5,41 @@ export interface LorebookEntry {
   comment: string
   content: string
   constant: boolean
+  vectorized: boolean
   selective: boolean
+  selectiveLogic: number
+  addMemo: boolean
   order: number
   position: number
   disable: boolean
+  ignoreBudget: boolean
   excludeRecursion: boolean
+  preventRecursion: boolean
+  matchPersonaDescription: boolean
+  matchCharacterDescription: boolean
+  matchCharacterPersonality: boolean
+  matchCharacterDepthPrompt: boolean
+  matchScenario: boolean
+  matchCreatorNotes: boolean
+  delayUntilRecursion: boolean
   probability: number
   useProbability: boolean
   depth: number
+  outletName: string
   group: string
+  groupOverride: boolean
+  groupWeight: number
   scanDepth: number | null
-  caseSensitive: boolean
-  matchWholeWords: boolean
+  caseSensitive: boolean | null
+  matchWholeWords: boolean | null
+  useGroupScoring: boolean | null
   automationId: string
-  role: number
+  role: number | null
   sticky: number
   cooldown: number
   delay: number
-  vectorized: boolean
+  triggers: unknown[]
+  displayIndex: number
 }
 
 export interface Lorebook {

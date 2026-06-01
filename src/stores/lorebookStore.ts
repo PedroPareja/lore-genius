@@ -63,7 +63,6 @@ export const useLorebookStore = create<LorebookState>((set, get) => ({
     const newEntry: LorebookEntry = {
       ...ENTRY_DEFAULTS,
       uid,
-      order: uid * 100,
     }
 
     set({
