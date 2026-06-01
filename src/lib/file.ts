@@ -75,10 +75,13 @@ export function normalizeLorebook(json: unknown): Lorebook {
 }
 
 export function exportLorebook(lorebook: Lorebook, filename: string): void {
+  const sortedEntries = Object.values(lorebook.entries).sort((a, b) => a.order - b.order)
+
   const orderedEntries: Record<string, Record<string, unknown>> = {}
-  for (const [key, entry] of Object.entries(lorebook.entries)) {
-    orderedEntries[key] = orderEntryFields(entry)
-  }
+  sortedEntries.forEach((entry, index) => {
+    const entryWithIndex = { ...orderEntryFields(entry), displayIndex: index }
+    orderedEntries[String(entry.uid)] = entryWithIndex
+  })
 
   const json = JSON.stringify({ entries: orderedEntries }, null, 2)
   const blob = new Blob([json], { type: "application/json" })
