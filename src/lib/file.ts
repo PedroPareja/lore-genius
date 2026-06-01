@@ -45,6 +45,25 @@ const ENTRY_FIELD_ORDER: (keyof LorebookEntry)[] = [
   "displayIndex",
 ]
 
+const INVALID_JSON_CHARS = /[\x00-\x08\x0B\x0C\x0E-\x1F]/g
+
+function sanitizeString(value: string): string {
+  return value.replace(INVALID_JSON_CHARS, "")
+}
+
+function sanitizeValue(value: unknown): unknown {
+  if (typeof value === "string") return sanitizeString(value)
+  if (Array.isArray(value)) return value.map(sanitizeValue)
+  if (value !== null && typeof value === "object") {
+    const result: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      result[sanitizeString(k)] = sanitizeValue(v)
+    }
+    return result
+  }
+  return value
+}
+
 function orderEntryFields(entry: LorebookEntry): Record<string, unknown> {
   const ordered: Record<string, unknown> = {}
   for (const key of ENTRY_FIELD_ORDER) {
@@ -83,7 +102,8 @@ export function exportLorebook(lorebook: Lorebook, filename: string): void {
     orderedEntries[String(entry.uid)] = entryWithIndex
   })
 
-  const json = JSON.stringify({ entries: orderedEntries }, null, 2)
+  const sanitized = sanitizeValue({ entries: orderedEntries })
+  const json = JSON.stringify(sanitized, null, 2)
   const blob = new Blob([json], { type: "application/json" })
   const url = URL.createObjectURL(blob)
   const a = document.createElement("a")
@@ -93,8 +113,12 @@ export function exportLorebook(lorebook: Lorebook, filename: string): void {
   URL.revokeObjectURL(url)
 }
 
-export async function importLorebook(file: File): Promise<Lorebook> {
+export async function importLorebook(file: File, name?: string): Promise<Lorebook> {
   const text = await file.text()
   const json = JSON.parse(text)
-  return normalizeLorebook(json)
+  const lorebook = normalizeLorebook(json)
+  if (name) {
+    lorebook.name = name
+  }
+  return lorebook
 }

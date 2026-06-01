@@ -1,5 +1,7 @@
-import { Settings, Upload, Download, FilePlus, ChevronLeft } from "lucide-react"
-import { Button } from "@/components/ui"
+import { Settings, Upload, Download, FilePlus, ChevronLeft, Pencil } from "lucide-react"
+import { useState } from "react"
+import { Button, Input } from "@/components/ui"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { ThemeToggle } from "./ThemeToggle"
 import { useLorebookStore } from "@/stores"
 import { exportLorebook, importLorebook } from "@/lib/file"
@@ -9,7 +11,9 @@ interface TopBarProps {
 }
 
 export function TopBar({ onOpenSettings }: TopBarProps) {
-  const { lorebook, createNewLorebook, loadLorebook, isDirty } = useLorebookStore()
+  const { lorebook, createNewLorebook, loadLorebook, updateMetadata, isDirty } = useLorebookStore()
+  const [nameDialogOpen, setNameDialogOpen] = useState(false)
+  const [tempName, setTempName] = useState("")
 
   const handleImport = async () => {
     const input = document.createElement("input")
@@ -20,7 +24,7 @@ export function TopBar({ onOpenSettings }: TopBarProps) {
       if (!file) return
 
       try {
-        const data = await importLorebook(file)
+        const data = await importLorebook(file, file.name.replace(/\.json$/, ""))
         loadLorebook(data)
       } catch (err) {
         console.error("Import failed:", err)
@@ -38,6 +42,20 @@ export function TopBar({ onOpenSettings }: TopBarProps) {
     createNewLorebook("Untitled Lorebook")
   }
 
+  const openNameDialog = () => {
+    if (lorebook) {
+      setTempName(lorebook.name)
+      setNameDialogOpen(true)
+    }
+  }
+
+  const saveName = () => {
+    if (lorebook && tempName.trim()) {
+      updateMetadata({ name: tempName.trim() })
+    }
+    setNameDialogOpen(false)
+  }
+
   return (
     <header className="h-[52px] border-b border-border bg-bg-surface flex items-center px-4 gap-2">
       <div className="flex items-center gap-2">
@@ -53,6 +71,9 @@ export function TopBar({ onOpenSettings }: TopBarProps) {
         <>
           <ChevronLeft className="h-4 w-4 text-text-secondary" />
           <span className="text-text-primary font-medium">{lorebook.name}</span>
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={openNameDialog} title="Edit lorebook name">
+            <Pencil className="h-3 w-3" />
+          </Button>
           {isDirty && (
             <span className="text-xs bg-warning/20 text-warning px-2 py-0.5 rounded">Unsaved</span>
           )}
@@ -81,6 +102,33 @@ export function TopBar({ onOpenSettings }: TopBarProps) {
           <Settings className="h-4 w-4" />
         </Button>
       </div>
+
+      <Dialog open={nameDialogOpen} onOpenChange={setNameDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Lorebook Name</DialogTitle>
+          </DialogHeader>
+          <div className="py-2">
+            <Input
+              value={tempName}
+              onChange={(e) => setTempName(e.target.value)}
+              placeholder="Lorebook name..."
+              onKeyDown={(e) => {
+                if (e.key === "Enter") saveName()
+              }}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNameDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={saveName}>
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </header>
   )
 }
