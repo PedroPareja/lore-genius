@@ -224,6 +224,20 @@ export function SettingsPage() {
                 Maximum context window in tokens (used for AI Lorebook generation budget). Estimated ~{Math.floor(settings.ai.maxContextSize / 4)} characters.
               </p>
             </div>
+
+            <div className="space-y-2">
+              <Label>Retries per Entry on Failure</Label>
+              <Input
+                type="number"
+                value={settings.ai.maxRetriesPerEntry}
+                onChange={(e) => updateAIConfig({ maxRetriesPerEntry: Math.max(0, parseInt(e.target.value) || 0) })}
+                min={0}
+                max={10}
+              />
+              <p className="text-xs text-text-secondary">
+                How many times to automatically retry a failed concept, persona, or character entry before aborting. Set to 0 to disable retries.
+              </p>
+            </div>
           </div>
         </section>
 

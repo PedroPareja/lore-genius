@@ -1,9 +1,12 @@
+import type { CharacterTemplate } from "./templates"
+
 export interface AILorebookRequest {
   worldIdea: string
   lorebookName: string
   targetCharacterCount: number
   generateConcepts: boolean
   templateIds?: string[]
+  ephemeralTemplates?: CharacterTemplate[]
   extraInstructions?: string
   includeUserPersona: boolean
 }

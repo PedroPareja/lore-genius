@@ -16,6 +16,7 @@ export interface AIConfig {
   temperature: number
   maxTokens: number
   maxContextSize: number
+  maxRetriesPerEntry: number
 }
 
 export interface AIContext {

@@ -12,6 +12,7 @@ const DEFAULT_AI_CONFIG: AIConfig = {
   temperature: 0.7,
   maxTokens: 1024,
   maxContextSize: 32768,
+  maxRetriesPerEntry: 3,
 }
 
 const DEFAULT_SETTINGS: AppSettings = {

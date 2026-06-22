@@ -60,7 +60,7 @@ function buildPlanPrompt(
   const templateList = templates
     .map(
       (t) =>
-        `- id:${t.id} name:${t.name}: ${t.data.slice(0, 200)}${t.data.length > 200 ? "..." : ""}`
+        `- id:"${t.id}" name:"${t.name}": ${t.data.slice(0, 500)}${t.data.length > 500 ? "..." : ""}`
     )
     .join("\n")
 
@@ -82,10 +82,11 @@ Respond with ONLY a valid JSON object in this exact format (no markdown fences, 
 
 Requirements:
 - Exactly ${request.targetCharacterCount} characters.
-- Each character must reference a UNIQUE templateId from those provided above (use the literal id strings). If fewer templates are available than ${request.targetCharacterCount}, you may reuse a template, but each character still needs a distinct name and role.
-- ${request.generateConcepts ? "Provide 4-8 concept keyword/role pairs relevant to the world." : "Return an empty concepts array."}
-- Character names should be evocative and appropriate to the world.
-- The role should be a single short noun phrase describing the character's function in the world.`
+- Each character must be based on one of the templates listed above. Choose the template whose data best fits the world and the character's role. The character's name, appearance hints, and fixed traits should come from the template's data — do NOT invent a personality that contradicts the template.
+- Each character must reference a UNIQUE templateId from those provided above (copy the literal id string exactly, including quotes). If fewer templates are available than ${request.targetCharacterCount}, you may reuse a template, but each character still needs a distinct name and role.
+- The "name" field should be a full character name (e.g. "June Osborne", "Arasaka Executive") inspired by the template.
+- The "role" should be a single short noun phrase describing the character's function in the world.
+- ${request.generateConcepts ? "Provide 4-8 concept keyword/role pairs relevant to the world." : "Return an empty concepts array."}`
 }
 
 function stripJsonFences(text: string): string {
@@ -110,6 +111,32 @@ async function callAI(prompt: string, hooks: AgentHooks): Promise<string> {
   return result
 }
 
+async function callAIWithRetry(
+  prompt: string,
+  hooks: AgentHooks,
+  stepLabel: string,
+  maxRetries: number
+): Promise<string> {
+  let lastError: unknown
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    if (attempt > 0) {
+      hooks.appendLog(`  Retry ${attempt}/${maxRetries} for "${stepLabel}"...`)
+    }
+    try {
+      return await callAI(prompt, hooks)
+    } catch (err) {
+      lastError = err
+      if (err instanceof AgentAbortError || (err instanceof Error && err.name === "AbortError")) {
+        throw err
+      }
+      if (attempt < maxRetries) {
+        hooks.appendLog(`  "${stepLabel}" failed (attempt ${attempt + 1}): ${err instanceof Error ? err.message : String(err)}. Retrying...`)
+      }
+    }
+  }
+  throw lastError
+}
+
 async function runPlan(
   request: AILorebookRequest,
   templates: CharacterTemplate[],
@@ -121,7 +148,8 @@ async function runPlan(
   const prompt = buildPlanPrompt(request, templates)
   let response: string
   try {
-    response = await callAI(prompt, hooks)
+    const maxRetries = useSettingsStore.getState().settings.ai.maxRetriesPerEntry
+    response = await callAIWithRetry(prompt, hooks, "plan", maxRetries)
   } catch (err) {
     hooks.updateStep("plan", { status: "error" })
     throw err
@@ -218,7 +246,7 @@ function buildCharacterPrompt(
   const profile = rollPersonality(name)
   const profileText = formatPersonality(profile)
   const templateBlock = template
-    ? `Character template "${template.name}" (immutable base material; template fixed traits PREVAIL over the rolled personality):\n${template.data}`
+    ? `Character template "${template.name}" (this is the IMMUTABLE base for this character; the character's appearance, fixed traits, and background MUST be derived from this template data. Template fixed traits PREVAIL over any conflicting rolled personality trait):\n${template.data}`
     : "No template provided — invent a coherent character that fits the world."
 
   return `Write a full SillyTavern character lorebook entry for the character "${name}".
@@ -236,16 +264,18 @@ ${priorContext ? `Previously generated entries (for world/name consistency):\n${
 [Random Personality Profile — inspiration only; the AI MAY override individual traits, but any trait the template fixes PREVAILS over the roll]
 ${profileText}
 
+IMPORTANT: The entry MUST be consistent with the template data above. Use the template's appearance description, fixed traits, and background as the foundation. The character's personality should be inspired by the rolled profile but must not contradict the template's fixed traits.
+
 Write the entry using these labeled sections (use the exact bold labels shown):
 
 **Appearance / Physical Description**:
-<physical description>
+<physical description based on the template>
 
 **Personality**:
 <personality, drawing on the rolled profile but respecting template fixed traits>
 
 **Bio**:
-<background and history>
+<background and history based on the template>
 
 **Motivations & Struggles**:
 <goals, conflicts, fears>
@@ -307,9 +337,15 @@ export async function runAgent(
   const settings = useSettingsStore.getState().settings
   const maxContextSize = settings.ai.maxContextSize
 
-  let templates = templatesStore.getAll()
-  if (request.templateIds && request.templateIds.length > 0) {
-    templates = templates.filter((t) => request.templateIds!.includes(t.id))
+  let templates: CharacterTemplate[]
+  if (request.ephemeralTemplates && request.ephemeralTemplates.length > 0) {
+    templates = request.ephemeralTemplates
+    hooks.appendLog(`Using ${templates.length} ephemeral template(s) from wizard import.`)
+  } else if (request.templateIds && request.templateIds.length > 0) {
+    templates = templatesStore.getAll().filter((t) => request.templateIds!.includes(t.id))
+    hooks.appendLog(`Using ${templates.length} template(s) from persistent store.`)
+  } else {
+    templates = templatesStore.getAll()
   }
   if (templates.length === 0 && request.targetCharacterCount > 0) {
     hooks.appendLog("No templates available, using generic character generation.")
@@ -381,7 +417,8 @@ export async function runAgent(
       hooks.setPhase("concepts")
       setStepStatus("user", "running")
       hooks.appendLog("Generating {{user}} persona entry...")
-      const userContent = await callAI(buildUserPersonaPrompt(plan, request), hooks)
+      const maxRetries = useSettingsStore.getState().settings.ai.maxRetriesPerEntry
+      const userContent = await callAIWithRetry(buildUserPersonaPrompt(plan, request), hooks, "{{user}} persona", maxRetries)
       tokensUsed += estimateTokens(userContent)
       hooks.setTokensUsed(tokensUsed)
       preparedEntries.push({
@@ -407,7 +444,8 @@ export async function runAgent(
         const stepId = `concept:${concept.keyword}`
         setStepStatus(stepId, "running")
         hooks.appendLog(`  concept "${concept.keyword}"...`)
-        const content = await callAI(buildConceptPrompt(concept, request), hooks)
+        const maxRetries = useSettingsStore.getState().settings.ai.maxRetriesPerEntry
+        const content = await callAIWithRetry(buildConceptPrompt(concept, request), hooks, `concept "${concept.keyword}"`, maxRetries)
         tokensUsed += estimateTokens(content)
         hooks.setTokensUsed(tokensUsed)
         preparedEntries.push({
@@ -445,9 +483,12 @@ export async function runAgent(
       const prior = summarisePrior(generated, headroom)
 
       hooks.appendLog(`  character "${char.name}" (role: ${char.role})...`)
-      const content = await callAI(
+      const maxRetries = useSettingsStore.getState().settings.ai.maxRetriesPerEntry
+      const content = await callAIWithRetry(
         buildCharacterPrompt(template, char.name, char.role, request, prior),
-        hooks
+        hooks,
+        `character "${char.name}"`,
+        maxRetries
       )
       tokensUsed += estimateTokens(content)
       hooks.setTokensUsed(tokensUsed)

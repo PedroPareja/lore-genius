@@ -84,7 +84,7 @@ export function AILorebookWizard() {
       lorebookName: lorebookName || "Untitled Lorebook",
       targetCharacterCount: targetCount,
       generateConcepts,
-      templateIds: ephemeralTemplatesRef.current.map((t) => t.id),
+      ephemeralTemplates: ephemeralTemplatesRef.current.length > 0 ? ephemeralTemplatesRef.current : undefined,
       extraInstructions: extraInstructions || undefined,
       includeUserPersona: true,
     }
