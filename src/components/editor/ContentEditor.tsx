@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useMemo } from "react"
 import { Eye, EyeOff } from "lucide-react"
 import { Textarea } from "@/components/ui"
 import { estimateTokens } from "@/lib/tokenizer"
@@ -10,12 +10,9 @@ interface ContentEditorProps {
 }
 
 export function ContentEditor({ value, onChange, showTokenCount = true }: ContentEditorProps) {
-  const [tokenCount, setTokenCount] = useState(0)
   const [previewMode, setPreviewMode] = useState(false)
 
-  useEffect(() => {
-    setTokenCount(estimateTokens(value))
-  }, [value])
+  const tokenCount = useMemo(() => estimateTokens(value), [value])
 
   const charCount = value.length
   const wordCount = value.split(/\s+/).filter(Boolean).length

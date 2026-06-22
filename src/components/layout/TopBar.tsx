@@ -1,9 +1,9 @@
-import { Settings, Upload, Download, FilePlus, ChevronLeft, Pencil } from "lucide-react"
+import { Settings, Upload, Download, FilePlus, ChevronLeft, Pencil, Users, Sparkles } from "lucide-react"
 import { useState } from "react"
 import { Button, Input } from "@/components/ui"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { ThemeToggle } from "./ThemeToggle"
-import { useLorebookStore } from "@/stores"
+import { useLorebookStore, useEditorStore } from "@/stores"
 import { exportLorebook, importLorebook } from "@/lib/file"
 
 interface TopBarProps {
@@ -12,6 +12,7 @@ interface TopBarProps {
 
 export function TopBar({ onOpenSettings }: TopBarProps) {
   const { lorebook, createNewLorebook, loadLorebook, updateMetadata, isDirty } = useLorebookStore()
+  const { setView } = useEditorStore()
   const [nameDialogOpen, setNameDialogOpen] = useState(false)
   const [tempName, setTempName] = useState("")
 
@@ -87,6 +88,10 @@ export function TopBar({ onOpenSettings }: TopBarProps) {
           <FilePlus className="h-4 w-4 mr-1" />
           New
         </Button>
+        <Button variant="ghost" size="sm" onClick={() => setView("ai-lorebook")} title="AI Lorebook">
+          <Sparkles className="h-4 w-4 mr-1" />
+          AI Lorebook
+        </Button>
         <Button variant="ghost" size="sm" onClick={handleImport} title="Import">
           <Upload className="h-4 w-4 mr-1" />
           Import
@@ -97,6 +102,10 @@ export function TopBar({ onOpenSettings }: TopBarProps) {
             Export
           </Button>
         )}
+        <Button variant="ghost" size="sm" onClick={() => setView("templates")} title="Templates">
+          <Users className="h-4 w-4 mr-1" />
+          Templates
+        </Button>
         <ThemeToggle />
         <Button variant="ghost" size="icon" onClick={onOpenSettings} title="Settings">
           <Settings className="h-4 w-4" />

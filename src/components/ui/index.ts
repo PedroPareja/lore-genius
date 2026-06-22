@@ -1,4 +1,4 @@
-export { Button, buttonVariants } from "./button"
+export { Button } from "./button"
 export { Input } from "./input"
 export { Textarea } from "./textarea"
 export { Label } from "./label"
@@ -9,5 +9,5 @@ export { Dialog, DialogPortal, DialogOverlay, DialogTrigger, DialogClose, Dialog
 export { Collapsible, CollapsibleTrigger, CollapsibleContent } from "./collapsible"
 export { Separator } from "./separator"
 export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "./tooltip"
-export { Badge, badgeVariants } from "./badge"
+export { Badge } from "./badge"
 export { Sheet, SheetPortal, SheetOverlay, SheetTrigger, SheetClose, SheetContent, SheetHeader, SheetFooter, SheetTitle, SheetDescription } from "./sheet"

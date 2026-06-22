@@ -1,3 +1,6 @@
 export * from "./lorebook"
 export * from "./ai"
 export * from "./settings"
+export * from "./personality"
+export * from "./templates"
+export * from "./agent"

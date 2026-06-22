@@ -1,5 +1,6 @@
 import { useEffect } from "react"
 import { useLorebookStore, useEditorStore } from "@/stores"
+import { rollPersonality, formatPersonality } from "@/lib/personality"
 
 interface ShortcutAction {
   key: string
@@ -10,7 +11,7 @@ interface ShortcutAction {
 
 export function useKeyboardShortcuts() {
   const { addEntry, deleteEntry, duplicateEntry, lorebook } = useLorebookStore()
-  const { selectedEntryUid, openAIPanel, selectEntry, aiPanelOpen, closeAIPanel, setShowDeleteConfirm } = useEditorStore()
+  const { selectedEntryUid, openAIPanel, selectEntry, aiPanelOpen, closeAIPanel, setShowDeleteConfirm, setView } = useEditorStore()
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -88,6 +89,34 @@ export function useKeyboardShortcuts() {
           },
         },
         {
+          key: "p",
+          ctrl: true,
+          shift: true,
+          action: () => {
+            e.preventDefault()
+            if (selectedEntryUid !== null) {
+              const entry = useLorebookStore.getState().getEntry(selectedEntryUid)
+              if (entry) {
+                const profile = rollPersonality()
+                const formatted = formatPersonality(profile)
+                const newContent = entry.content
+                  ? `${entry.content}\n\n${formatted}`
+                  : formatted
+                useLorebookStore.getState().updateEntry(selectedEntryUid, { content: newContent })
+              }
+            }
+          },
+        },
+        {
+          key: "n",
+          ctrl: true,
+          shift: true,
+          action: () => {
+            e.preventDefault()
+            setView("ai-lorebook")
+          },
+        },
+        {
           key: "Delete",
           action: () => {
             if (selectedEntryUid !== null) {
@@ -130,5 +159,5 @@ export function useKeyboardShortcuts() {
 
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [selectedEntryUid, aiPanelOpen, lorebook, addEntry, deleteEntry, duplicateEntry, selectEntry, openAIPanel, closeAIPanel, setShowDeleteConfirm])
+  }, [selectedEntryUid, aiPanelOpen, lorebook, addEntry, deleteEntry, duplicateEntry, selectEntry, openAIPanel, closeAIPanel, setShowDeleteConfirm, setView])
 }

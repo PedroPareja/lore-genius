@@ -210,6 +210,20 @@ export function SettingsPage() {
                 max={4096}
               />
             </div>
+
+            <div className="space-y-2">
+              <Label>Max Context Size</Label>
+              <Input
+                type="number"
+                value={settings.ai.maxContextSize}
+                onChange={(e) => updateAIConfig({ maxContextSize: parseInt(e.target.value) || 32768 })}
+                min={1024}
+                step={512}
+              />
+              <p className="text-xs text-text-secondary">
+                Maximum context window in tokens (used for AI Lorebook generation budget). Estimated ~{Math.floor(settings.ai.maxContextSize / 4)} characters.
+              </p>
+            </div>
           </div>
         </section>
 

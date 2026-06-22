@@ -2,8 +2,10 @@ import { create } from "zustand"
 
 export type FilterStatus = "all" | "enabled" | "disabled" | "constant"
 export type SortOption = "order" | "name" | "group" | "modified"
+export type View = "editor" | "templates" | "ai-lorebook"
 
 interface EditorState {
+  view: View
   selectedEntryUid: number | null
   aiPanelOpen: boolean
   advancedOptionsExpanded: boolean
@@ -12,6 +14,7 @@ interface EditorState {
   filterStatus: FilterStatus
   sortBy: SortOption
   showDeleteConfirm: boolean
+  setView: (view: View) => void
   selectEntry: (uid: number | null) => void
   openAIPanel: () => void
   closeAIPanel: () => void
@@ -23,6 +26,7 @@ interface EditorState {
 }
 
 export const useEditorStore = create<EditorState>((set) => ({
+  view: "editor",
   selectedEntryUid: null,
   aiPanelOpen: false,
   advancedOptionsExpanded: true,
@@ -31,6 +35,10 @@ export const useEditorStore = create<EditorState>((set) => ({
   filterStatus: "all",
   sortBy: "order",
   showDeleteConfirm: false,
+
+  setView: (view) => {
+    set({ view })
+  },
 
   selectEntry: (uid) => {
     set({ selectedEntryUid: uid })

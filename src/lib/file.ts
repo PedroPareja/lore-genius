@@ -45,10 +45,18 @@ const ENTRY_FIELD_ORDER: (keyof LorebookEntry)[] = [
   "displayIndex",
 ]
 
-const INVALID_JSON_CHARS = /[\x00-\x08\x0B\x0C\x0E-\x1F]/g
+const INVALID_CHAR_CODES = new Set<number>()
+for (let i = 0x00; i <= 0x08; i++) INVALID_CHAR_CODES.add(i)
+for (let i = 0x0e; i <= 0x1f; i++) INVALID_CHAR_CODES.add(i)
+INVALID_CHAR_CODES.add(0x0b)
+INVALID_CHAR_CODES.add(0x0c)
 
 function sanitizeString(value: string): string {
-  return value.replace(INVALID_JSON_CHARS, "")
+  let result = ""
+  for (const ch of value) {
+    if (!INVALID_CHAR_CODES.has(ch.charCodeAt(0))) result += ch
+  }
+  return result
 }
 
 function sanitizeValue(value: unknown): unknown {

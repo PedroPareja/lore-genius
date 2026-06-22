@@ -15,6 +15,7 @@ export interface AIConfig {
   systemPrompt: string
   temperature: number
   maxTokens: number
+  maxContextSize: number
 }
 
 export interface AIContext {

@@ -11,6 +11,7 @@ const DEFAULT_AI_CONFIG: AIConfig = {
     "You are a creative writing assistant specializing in worldbuilding and lore creation for roleplay. Write concise, factual, and evocative lore entries.",
   temperature: 0.7,
   maxTokens: 1024,
+  maxContextSize: 32768,
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -34,7 +35,12 @@ function getStoredSettings(): AppSettings | null {
   try {
     const stored = localStorage.getItem("loregenius-settings")
     if (stored) {
-      return { ...DEFAULT_SETTINGS, ...JSON.parse(stored) }
+      const parsed = JSON.parse(stored)
+      return {
+        ...DEFAULT_SETTINGS,
+        ...parsed,
+        ai: { ...DEFAULT_AI_CONFIG, ...parsed.ai },
+      }
     }
   } catch {
     // ignore

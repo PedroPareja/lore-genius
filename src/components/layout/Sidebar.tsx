@@ -77,7 +77,7 @@ export function Sidebar() {
     }
 
     return result
-  }, [lorebook, getEntries, searchQuery, filterStatus])
+  }, [getEntries, searchQuery, filterStatus])
 
   const handleNewEntry = () => {
     const uid = addEntry()

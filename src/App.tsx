@@ -4,7 +4,7 @@ import { AppShell } from "@/components/layout"
 import { EntryEditor } from "@/components/editor"
 import { SettingsPage } from "@/components/settings"
 import { AIPanel } from "@/components/ai"
-import { useEditorStore, useSettingsStore } from "@/stores"
+import { useEditorStore, useSettingsStore, useTemplatesStore } from "@/stores"
 import { useKeyboardShortcuts, useAutoSave, useTheme } from "@/hooks"
 import { TooltipProvider } from "@/components/ui"
 
@@ -31,6 +31,7 @@ function AppContent() {
 export function App() {
   useEffect(() => {
     useSettingsStore.getState().loadFromStorage()
+    useTemplatesStore.getState().loadFromStorage()
   }, [])
 
   return (

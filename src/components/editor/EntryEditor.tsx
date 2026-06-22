@@ -1,9 +1,10 @@
-import { Sparkles, Copy, Trash2, ArrowLeft } from "lucide-react"
+import { Sparkles, Copy, Trash2, ArrowLeft, Shuffle } from "lucide-react"
 import { Button } from "@/components/ui"
 import { useLorebookStore, useEditorStore } from "@/stores"
 import { KeywordInput } from "./KeywordInput"
 import { ContentEditor } from "./ContentEditor"
 import { AdvancedOptions } from "./AdvancedOptions"
+import { rollPersonality, formatPersonality } from "@/lib/personality"
 
 export function EntryEditor() {
   const { getEntry, updateEntry, deleteEntry, duplicateEntry } = useLorebookStore()
@@ -114,6 +115,22 @@ export function EntryEditor() {
             <Button variant="secondary" onClick={() => openAIPanel()}>
               <Sparkles className="h-4 w-4 mr-2" />
               AI Write
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                if (selectedEntryUid !== null && entry) {
+                  const profile = rollPersonality()
+                  const formatted = formatPersonality(profile)
+                  const newContent = entry.content
+                    ? `${entry.content}\n\n${formatted}`
+                    : formatted
+                  updateEntry(selectedEntryUid, { content: newContent })
+                }
+              }}
+            >
+              <Shuffle className="h-4 w-4 mr-2" />
+              Random Personality
             </Button>
           </div>
 
