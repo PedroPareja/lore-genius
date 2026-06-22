@@ -12,6 +12,7 @@ export function TemplatesManager() {
   const { setView } = useEditorStore()
   const [editorOpen, setEditorOpen] = useState(false)
   const [editingTemplate, setEditingTemplate] = useState<CharacterTemplate | null>(null)
+  const [newNonce, setNewNonce] = useState(0) // forces a fresh remount each time "New Template" is clicked
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [importError, setImportError] = useState<string | null>(null)
   const [importResult, setImportResult] = useState<{ added: number; overwritten: number } | null>(null)
@@ -19,6 +20,7 @@ export function TemplatesManager() {
 
   const handleNew = () => {
     setEditingTemplate(null)
+    setNewNonce((n) => n + 1)
     setEditorOpen(true)
   }
 
@@ -161,7 +163,7 @@ export function TemplatesManager() {
         </div>
 
         <TemplateEditor
-          key={editingTemplate?.id ?? "new"}
+          key={editingTemplate?.id ?? `new-${newNonce}`}
           open={editorOpen}
           onOpenChange={(open) => {
             setEditorOpen(open)
