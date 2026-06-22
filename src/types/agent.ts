@@ -23,5 +23,5 @@ export interface AgentStep {
 export interface AgentPlan {
   userPersonaSummary: string
   concepts: { keyword: string; role: string }[]
-  characters: { templateId: string; templateName: string; name: string; role: string }[]
+  characters: { role: string }[]
 }

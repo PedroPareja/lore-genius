@@ -60,7 +60,7 @@ function buildPlanPrompt(
   const templateList = templates
     .map(
       (t) =>
-        `- id:"${t.id}" name:"${t.name}": ${t.data.slice(0, 500)}${t.data.length > 500 ? "..." : ""}`
+        `- "${t.name}": ${t.data.slice(0, 500)}${t.data.length > 500 ? "..." : ""}`
     )
     .join("\n")
 
@@ -70,22 +70,19 @@ World Idea: ${request.worldIdea}
 Target Character Count: ${request.targetCharacterCount}
 ${request.extraInstructions ? `Extra Instructions: ${request.extraInstructions}` : ""}
 
-Available Character Templates:
+Available Character Templates (the character's name will be taken directly from the template — do NOT invent names):
 ${templateList || "No templates available. Invent distinct character concepts grounded in the world."}
 
 Respond with ONLY a valid JSON object in this exact format (no markdown fences, no explanation):
 {
   "userPersonaSummary": "a short paragraph describing the user's persona in this world",
   "concepts": [{"keyword": "concept_name", "role": "brief description"}],
-  "characters": [{"templateId": "template_id", "templateName": "Template Name", "name": "Character Name", "role": "their role/job"}]
+  "characters": [{"role": "their role/job in the world"}]
 }
 
 Requirements:
 - Exactly ${request.targetCharacterCount} characters.
-- Each character must be based on one of the templates listed above. Choose the template whose data best fits the world and the character's role. The character's name, appearance hints, and fixed traits should come from the template's data — do NOT invent a personality that contradicts the template.
-- Each character must reference a UNIQUE templateId from those provided above (copy the literal id string exactly, including quotes). If fewer templates are available than ${request.targetCharacterCount}, you may reuse a template, but each character still needs a distinct name and role.
-- The "name" field should be a full character name (e.g. "June Osborne", "Arasaka Executive") inspired by the template.
-- The "role" should be a single short noun phrase describing the character's function in the world.
+- Each "role" should describe the character's function in the world (e.g. "religious leader", "rebel fighter", "corporate executive", "street vendor"). The AI will later match each role to the most appropriate template by name and data.
 - ${request.generateConcepts ? "Provide 4-8 concept keyword/role pairs relevant to the world." : "Return an empty concepts array."}`
 }
 
@@ -166,28 +163,6 @@ async function runPlan(
       hooks.appendLog(
         `Warning: model returned ${plan.characters.length} characters (requested ${request.targetCharacterCount}); proceeding with the model's count.`
       )
-    }
-
-    // Reconcile template ids against the known set; if a model returns an unknown id or a
-    // duplicate, fall back to an unused template so each character references a real template.
-    const knownIds = new Set(templates.map((t) => t.id))
-    const knownNames = new Map(templates.map((t) => [t.name, t.id] as const))
-    const usedIds = new Set<string>()
-    for (const c of plan.characters) {
-      let id = c.templateId
-      if (!knownIds.has(id)) {
-        id = knownNames.get(c.templateName) ?? (c.templateId as string)
-      }
-      if (!knownIds.has(id) || usedIds.has(id)) {
-        const free = templates.find((t) => !usedIds.has(t.id))
-        id = free ? free.id : (id ?? "")
-      }
-      usedIds.add(id)
-      c.templateId = id
-      if (!c.templateName) {
-        const t = templates.find((t) => t.id === id)
-        if (t) c.templateName = t.name
-      }
     }
 
     if (!Array.isArray(plan.concepts)) plan.concepts = []
@@ -469,6 +444,13 @@ export async function runAgent(
     hooks.setPhase("characters")
     hooks.appendLog(`Generating ${plan.characters.length} character entries...`)
 
+    // Fisher-Yates shuffle of template pool; assign one per character (cycle if templates < characters).
+    const shuffled = [...templates]
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+    }
+
     const generated: { name: string; content: string }[] = []
     for (let i = 0; i < plan.characters.length; i++) {
       checkAborted(hooks.getSignal())
@@ -476,36 +458,35 @@ export async function runAgent(
       const stepId = `char:${i}`
       setStepStatus(stepId, "running")
 
-      const template = templates.find(
-        (t) => t.id === char.templateId || t.name === char.templateName
-      )
+      const template = shuffled[i % shuffled.length]
+      const charName = template.name
       const headroom = Math.max(1024, Math.floor(maxContextSize * 0.6))
       const prior = summarisePrior(generated, headroom)
 
-      hooks.appendLog(`  character "${char.name}" (role: ${char.role})...`)
+      hooks.appendLog(`  character "${charName}" (role: ${char.role})...`)
       const maxRetries = useSettingsStore.getState().settings.ai.maxRetriesPerEntry
       const content = await callAIWithRetry(
-        buildCharacterPrompt(template, char.name, char.role, request, prior),
+        buildCharacterPrompt(template, charName, char.role, request, prior),
         hooks,
-        `character "${char.name}"`,
+        `character "${charName}"`,
         maxRetries
       )
       tokensUsed += estimateTokens(content)
       hooks.setTokensUsed(tokensUsed)
 
-      const keywords = extractKeywords(char.name, char.role)
+      const keywords = extractKeywords(charName, char.role)
       preparedEntries.push({
         stepId,
         partial: {
           key: keywords,
-          comment: char.name,
+          comment: charName,
           content,
           constant: false,
           position: 1,
           group: "characters",
         },
       })
-      generated.push({ name: char.name, content })
+      generated.push({ name: charName, content })
       setStepStatus(stepId, "done")
       hooks.appendLog(`    keywords: ${keywords.join(", ")}`)
       characterCount++
