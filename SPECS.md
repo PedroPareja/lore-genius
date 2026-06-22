@@ -13,26 +13,27 @@
 | Layer            | Technology                         | Rationale                                      |
 | ---------------- | ---------------------------------- | ---------------------------------------------- |
 | Package Manager  | pnpm                               | Secure, disk-efficient, strict dependency resolution |
-| Framework        | React 18+ with TypeScript          | Mature ecosystem, strong typing                |
-| Build Tool       | Vite 5+                            | Fast HMR, native ESM, minimal config           |
-| Styling          | Tailwind CSS 3+                    | Utility-first, consistent design tokens        |
+| Framework        | React 19 with TypeScript           | Mature ecosystem, strong typing                |
+| Build Tool       | Vite 8                             | Fast HMR, native ESM, minimal config           |
+| Styling          | Tailwind CSS 4 (`@tailwindcss/vite`)| Utility-first, zero-config via Vite plugin + `@theme inline` |
 | UI Components    | shadcn/ui (Radix primitives)       | Accessible, unstyled, copy-paste components    |
 | State Management | Zustand                            | Lightweight, no boilerplate, TypeScript-first  |
 | Icons            | Lucide React                       | Consistent, tree-shakeable SVG icon set        |
-| AI Integration   | OpenAI SDK (client-side)           | Compatible with all OpenAI-style endpoints      |
+| AI Integration   | Raw `fetch` to OpenAI-style `/chat/completions` (SSE streaming) | Compatible with all OpenAI-style endpoints; the `openai` SDK is installed but currently unused |
 | File Handling    | Native File API + Blob download    | Import/export JSON without backend             |
-| Validation       | Zod                                | Runtime type validation for lorebook JSON      |
+| Validation       | Spread-merge normalization (`ENTRY_DEFAULTS`/`LOREBOOK_DEFAULTS`) | Loose validation tolerant of older SillyTavern formats. (`zod` is a dependency but no schemas are defined yet) |
 | Token Estimation | `gpt-tokenizer` (fallback: char heuristic) | Accurate token counting for content         |
-| Routing          | React Router v6                    | Simple client-side routing (settings, editor)  |
-| Testing          | Vitest + React Testing Library     | Fast, Vite-native unit/component tests         |
+| Routing          | React Router v7                    | Simple client-side routing (settings, editor)  |
 | Linting          | ESLint + Prettier                  | Consistent code style                          |
-| Type Checking    | TypeScript 5+ (strict mode)        | Full type safety                               |
+| Type Checking    | TypeScript (strict mode)           | Full type safety                               |
+
+> Note: A Vitest + React Testing Library setup is planned but not yet present — there are no test scripts or test files.
 
 ### No Backend
 
 The app is fully client-side. AI API calls are made directly from the browser to the configured endpoint. No server, no database, no user accounts. All data lives in:
 
-- **localStorage**: App settings, AI config, last-opened lorebook state
+- **localStorage**: App settings (key `loregenius-settings`) and auto-save drafts (key `lorebook-draft`)
 - **File system**: JSON files imported/exported by the user
 
 ---
@@ -45,107 +46,92 @@ lore-genius-3/
 │   └── favicon.svg
 ├── src/
 │   ├── main.tsx                    # App entry point
-│   ├── App.tsx                     # Root component, routing
+│   ├── App.tsx                     # Root component, routing, global hook wiring
 │   ├── vite-env.d.ts
 │   │
 │   ├── components/
 │   │   ├── layout/
-│   │   │   ├── AppShell.tsx        # Top bar + sidebar + main layout
-│   │   │   ├── Sidebar.tsx         # Entry list container
-│   │   │   ├── TopBar.tsx          # Logo, lorebook name, actions
-│   │   │   └── ThemeToggle.tsx     # Dark/light mode switch
+│   │   │   ├── AppShell.tsx        # Top bar + sidebar + main layout, renders AIPanel
+│   │   │   ├── Sidebar.tsx         # Entry list container (inline EntryCard, search, status filter, "+ New Entry")
+│   │   │   ├── TopBar.tsx          # Logo, lorebook name, import/export, settings nav
+│   │   │   ├── ThemeToggle.tsx     # Dark/light/system switch
+│   │   │   └── index.ts
 │   │   │
 │   │   ├── editor/
-│   │   │   ├── EntryEditor.tsx     # Main entry editing view
-│   │   │   ├── KeywordInput.tsx    # Tag-style keyword chips
-│   │   │   ├── ContentEditor.tsx   # Multi-line textarea with stats
-│   │   │   ├── AdvancedOptions.tsx # Collapsible advanced fields
-│   │   │   ├── PositionSelect.tsx  # Position dropdown (0/1/2)
-│   │   │   └── EntryActions.tsx    # Duplicate, delete, disable buttons
-│   │   │
-│   │   ├── sidebar/
-│   │   │   ├── EntryList.tsx       # Scrollable entry list
-│   │   │   ├── EntryCard.tsx       # Individual entry in list
-│   │   │   ├── SearchBar.tsx       # Search input
-│   │   │   ├── FilterBar.tsx       # Group + status filters
-│   │   │   └── NewEntryButton.tsx  # Add entry CTA
+│   │   │   ├── EntryEditor.tsx     # Main entry editing view (comment, keys, content, actions)
+│   │   │   ├── KeywordInput.tsx    # Tag-style keyword chips (primary + secondary)
+│   │   │   ├── ContentEditor.tsx   # Textarea + char/word/token stats + preview toggle
+│   │   │   ├── AdvancedOptions.tsx # Collapsible advanced fields (incl. inline Position/Role/NullableBool selects)
+│   │   │   └── index.ts
 │   │   │
 │   │   ├── ai/
-│   │   │   ├── AIPanel.tsx         # Slide-in AI assistant panel
-│   │   │   ├── AIModeSelect.tsx    # Write/Edit/Expand/Chat selector
+│   │   │   ├── AIPanel.tsx         # Slide-in AI assistant panel (builds prompt, calls aiStore.generate)
+│   │   │   ├── AIPreviewDialog.tsx # Result preview with Replace / Extend / Abort actions
 │   │   │   ├── AIResult.tsx        # Streaming result display
-│   │   │   └── AIActions.tsx       # Accept/Regenerate/Discard
+│   │   │   └── index.ts
 │   │   │
 │   │   ├── settings/
-│   │   │   ├── SettingsPage.tsx    # Full settings view
-│   │   │   ├── AIConfig.tsx        # Endpoint, key, model config
-│   │   │   ├── AIProviderSelect.tsx# Provider preset dropdown
-│   │   │   ├── ModelSelect.tsx     # Model list with refresh
-│   │   │   ├── ConnectionTest.tsx  # Test connection button + status
-│   │   │   └── AppPreferences.tsx  # Theme, auto-save, sidebar prefs
-│   │   │
-│   │   ├── lorebook/
-│   │   │   ├── LorebookMeta.tsx    # Lorebook name, description, globals
-│   │   │   └── ImportExport.tsx    # File import/export controls
+│   │   │   ├── SettingsPage.tsx    # Full settings view (AI config, behaviour, app prefs, LM Studio test)
+│   │   │   └── index.ts
 │   │   │
 │   │   └── ui/                     # shadcn/ui primitives
 │   │       ├── button.tsx
 │   │       ├── input.tsx
 │   │       ├── textarea.tsx
+│   │       ├── label.tsx
 │   │       ├── select.tsx
 │   │       ├── dialog.tsx
-│   │       ├── toast.tsx
 │   │       ├── tooltip.tsx
 │   │       ├── switch.tsx
 │   │       ├── slider.tsx
 │   │       ├── badge.tsx
 │   │       ├── separator.tsx
 │   │       ├── collapsible.tsx
-│   │       ├── dropdown-menu.tsx
-│   │       └── sheet.tsx
+│   │       ├── sheet.tsx
+│   │       └── index.ts
 │   │
 │   ├── stores/
-│   │   ├── lorebookStore.ts        # Lorebook state (entries, metadata)
-│   │   ├── editorStore.ts          # Editor UI state (selected entry, panels)
-│   │   ├── settingsStore.ts        # App settings (AI config, preferences)
-│   │   └── aiStore.ts              # AI interaction state (streaming, results)
+│   │   ├── lorebookStore.ts        # Lorebook state (entries, metadata). Not persisted.
+│   │   ├── editorStore.ts          # Editor UI state (selected entry, panels, filters). Not persisted.
+│   │   ├── settingsStore.ts        # App settings. Manually persisted to localStorage.
+│   │   ├── aiStore.ts              # AI interaction state + streaming fetch implementation. Not persisted.
+│   │   └── index.ts
 │   │
 │   ├── lib/
-│   │   ├── ai.ts                   # AI service (OpenAI-compatible calls)
-│   │   ├── prompts.ts              # System/user prompt templates
-│   │   ├── validation.ts           # Zod schemas for lorebook JSON
-│   │   ├── tokenizer.ts            # Token count estimation
-│   │   ├── file.ts                 # JSON import/export utilities
-│   │   ├── uid.ts                  # UID generation
-│   │   ├── defaults.ts             # Default values for entries/lorebook
-│   │   └── utils.ts                # Shared helpers (cn, truncate, etc.)
+│   │   ├── defaults.ts             # ENTRY_DEFAULTS, LOREBOOK_DEFAULTS
+│   │   ├── file.ts                 # JSON import/export (normalize, order fields, sanitize, download)
+│   │   ├── tokenizer.ts            # estimateTokens() via gpt-tokenizer
+│   │   ├── utils.ts                # cn(), truncate(), generateUid()
+│   │   └── (no ai.ts / prompts.ts / validation.ts / uid.ts — see sections 6 & 7)
 │   │
 │   ├── hooks/
 │   │   ├── useKeyboardShortcuts.ts # Global shortcut registration
-│   │   ├── useAutoSave.ts          # Debounced auto-save logic
-│   │   ├── useAI.ts                # AI generation hook (streaming)
-│   │   └── useLocalStorage.ts      # Typed localStorage wrapper
+│   │   ├── useAutoSave.ts          # Debounced draft auto-save to localStorage
+│   │   ├── useTheme.ts             # Theme application + cycling toggle
+│   │   └── index.ts
 │   │
 │   ├── types/
-│   │   ├── lorebook.ts             # TypeScript types for lorebook schema
-│   │   ├── ai.ts                   # AI config and response types
-│   │   └── settings.ts             # App settings types
+│   │   ├── lorebook.ts             # Lorebook / LorebookEntry types, EntryPosition / EntryRole
+│   │   ├── ai.ts                   # AIConfig / AIProvider / AIMode / AIContext
+│   │   ├── settings.ts             # AppSettings / Theme / AutoSaveInterval
+│   │   └── index.ts
 │   │
 │   └── styles/
-│       └── globals.css             # Tailwind directives + custom styles
+│       └── globals.css             # Tailwind 4 `@import`, `@theme inline` token mapping, base styles
 │
 ├── index.html
 ├── package.json
 ├── pnpm-lock.yaml
 ├── tsconfig.json
+├── tsconfig.app.json
 ├── tsconfig.node.json
-├── vite.config.ts
-├── tailwind.config.ts
-├── postcss.config.js
+├── vite.config.ts                  # react + @tailwindcss/vite, `@` → ./src alias
 ├── eslint.config.js
 ├── .prettierrc
 └── README.md
 ```
+
+> Tailwind 4 is configured entirely in `vite.config.ts` (the `@tailwindcss/vite` plugin) and `src/styles/globals.css` (`@import "tailwindcss";` + an `@theme inline { ... }` block mapping `--color-*` tokens to CSS custom properties). There is **no `tailwind.config.ts`** and **no `postcss.config.js`**.
 
 ---
 
@@ -167,6 +153,8 @@ interface Lorebook {
 
 ### 4.2 LorebookEntry
 
+The entry model mirrors the full SillyTavern lorebook entry schema (all fields are present on import/export):
+
 ```typescript
 interface LorebookEntry {
   uid: number
@@ -175,25 +163,45 @@ interface LorebookEntry {
   comment: string
   content: string
   constant: boolean
+  vectorized: boolean
   selective: boolean
+  selectiveLogic: number
+  addMemo: boolean
   order: number
   position: number
   disable: boolean
+  ignoreBudget: boolean
   excludeRecursion: boolean
+  preventRecursion: boolean
+  matchPersonaDescription: boolean
+  matchCharacterDescription: boolean
+  matchCharacterPersonality: boolean
+  matchCharacterDepthPrompt: boolean
+  matchScenario: boolean
+  matchCreatorNotes: boolean
+  delayUntilRecursion: boolean
   probability: number
   useProbability: boolean
   depth: number
+  outletName: string
   group: string
+  groupOverride: boolean
+  groupWeight: number
   scanDepth: number | null
-  caseSensitive: boolean
-  matchWholeWords: boolean
+  caseSensitive: boolean | null
+  matchWholeWords: boolean | null
+  useGroupScoring: boolean | null
   automationId: string
-  role: number
+  role: number | null
   sticky: number
   cooldown: number
   delay: number
-  vectorized: boolean
+  triggers: unknown[]
+  displayIndex: number
 }
+
+type EntryPosition = 0 | 1 | 2   // 0: Before Char Def, 1: After Char Def, 2: Author's Note
+type EntryRole    = 0 | 1 | 2   // 0: System, 1: User, 2: Assistant (null = default/System)
 ```
 
 ### 4.3 Entry Defaults
@@ -206,24 +214,41 @@ const ENTRY_DEFAULTS: LorebookEntry = {
   comment: "",
   content: "",
   constant: false,
-  selective: false,
+  vectorized: false,
+  selective: true,
+  selectiveLogic: 0,
+  addMemo: true,
   order: 100,
   position: 0,
   disable: false,
+  ignoreBudget: false,
   excludeRecursion: false,
+  preventRecursion: false,
+  matchPersonaDescription: false,
+  matchCharacterDescription: false,
+  matchCharacterPersonality: false,
+  matchCharacterDepthPrompt: false,
+  matchScenario: false,
+  matchCreatorNotes: false,
+  delayUntilRecursion: false,
   probability: 100,
-  useProbability: false,
+  useProbability: true,
   depth: 4,
-  group: "default",
+  outletName: "",
+  group: "",
+  groupOverride: false,
+  groupWeight: 100,
   scanDepth: null,
-  caseSensitive: false,
-  matchWholeWords: false,
+  caseSensitive: null,
+  matchWholeWords: null,
+  useGroupScoring: null,
   automationId: "",
-  role: 0,
+  role: null,
   sticky: 0,
   cooldown: 0,
   delay: 0,
-  vectorized: false,
+  triggers: [],
+  displayIndex: 0,
 }
 ```
 
@@ -260,12 +285,27 @@ type AIProvider =
   | "openai"
   | "custom"
 
-const AI_DEFAULTS: AIConfig = {
+type AIMode = "write" | "expand"
+
+interface AIContext {
+  entryComment: string
+  entryKeys: string[]
+  entryKeysecondary: string[]
+  entryGroup: string
+  entryContent: string
+}
+```
+
+The default config is defined inside `settingsStore.ts` as `DEFAULT_AI_CONFIG`:
+
+```typescript
+const DEFAULT_AI_CONFIG: AIConfig = {
   provider: "openai-compatible",
   endpoint: "http://localhost:1234/v1",
   apiKey: "",
   model: "",
-  systemPrompt: "You are a creative writing assistant specializing in worldbuilding and lore creation for roleplay. Write concise, factual, and evocative lore entries.",
+  systemPrompt:
+    "You are a creative writing assistant specializing in worldbuilding and lore creation for roleplay. Write concise, factual, and evocative lore entries.",
   temperature: 0.7,
   maxTokens: 1024,
 }
@@ -274,28 +314,43 @@ const AI_DEFAULTS: AIConfig = {
 ### 4.6 App Settings
 
 ```typescript
+type Theme = "dark" | "light" | "system"
+type AutoSaveInterval = "off" | "5s" | "10s" | "30s"
+
 interface AppSettings {
-  theme: "dark" | "light" | "system"
+  theme: Theme
   sidebarExpanded: boolean
-  autoSave: "off" | "5s" | "10s" | "30s"
+  autoSave: AutoSaveInterval
   showTokenCount: boolean
   ai: AIConfig
+}
+
+const DEFAULT_SETTINGS: AppSettings = {
+  theme: "dark",
+  sidebarExpanded: true,
+  autoSave: "off",
+  showTokenCount: true,
+  ai: DEFAULT_AI_CONFIG,
 }
 ```
 
 ### 4.7 Editor UI State
 
+Defined inside `editorStore.ts`:
+
 ```typescript
+type FilterStatus = "all" | "enabled" | "disabled" | "constant"
+type SortOption   = "order" | "name" | "group" | "modified"
+
 interface EditorState {
   selectedEntryUid: number | null
   aiPanelOpen: boolean
-  aiPanelMode: "write" | "edit" | "expand" | "chat"
   advancedOptionsExpanded: boolean
-  unsavedChanges: Set<number>
   searchQuery: string
   filterGroup: string | null
-  filterStatus: "all" | "enabled" | "disabled" | "constant"
-  sortBy: "order" | "name" | "group" | "modified"
+  filterStatus: FilterStatus
+  sortBy: SortOption
+  showDeleteConfirm: boolean
 }
 ```
 
@@ -303,9 +358,11 @@ interface EditorState {
 
 ## 5. State Management (Zustand Stores)
 
+All four stores use `create()` from `zustand`. **None use the `persist` middleware** — persistence is performed manually (settings via `localStorage["loregenius-settings"]`, drafts via `localStorage["lorebook-draft"]`).
+
 ### 5.1 lorebookStore
 
-Manages the lorebook data. This is the single source of truth for all entry and metadata operations.
+Manages lorebook data; the single source of truth for all entry and metadata operations. Not persisted.
 
 ```
 State:
@@ -313,18 +370,19 @@ State:
   - isDirty: boolean
 
 Actions:
-  - loadLorebook(data: Lorebook): void
+  - loadLorebook(data: Lorebook): void            (also resets editor selection/search/filter)
   - createNewLorebook(name: string): void
   - updateMetadata(fields: Partial<Lorebook>): void
-  - addEntry(): number  (returns new uid)
+  - addEntry(): number                             (returns new uid; uses ENTRY_DEFAULTS + getNextUid())
   - updateEntry(uid: number, fields: Partial<LorebookEntry>): void
   - deleteEntry(uid: number): void
-  - duplicateEntry(uid: number): number  (returns new uid)
-  - moveEntry(fromUid: number, toIndex: number): void
+  - duplicateEntry(uid: number): number            (returns new uid; comment += " (copy)", order += 1)
+  - moveEntry(fromUid: number, toIndex: number): void  (sets order = toIndex * 100)
   - getEntry(uid: number): LorebookEntry | undefined
-  - getEntries(): LorebookEntry[]
-  - getNextUid(): number
+  - getEntries(): LorebookEntry[]                  (sorted by `order` ascending)
+  - getNextUid(): number                          (0 if empty, else maxUid + 1)
   - reset(): void
+  - markClean(): void                              (sets isDirty = false)
 ```
 
 ### 5.2 editorStore
@@ -335,55 +393,61 @@ Manages UI state for the editor. Not persisted.
 State:
   - selectedEntryUid: number | null
   - aiPanelOpen: boolean
-  - aiPanelMode: AIMode
-  - advancedExpanded: boolean
+  - advancedOptionsExpanded: boolean              (default true)
   - searchQuery: string
   - filterGroup: string | null
-  - filterStatus: FilterStatus
-  - sortBy: SortOption
+  - filterStatus: FilterStatus                     (default "all")
+  - sortBy: SortOption                             (default "order")
+  - showDeleteConfirm: boolean
 
 Actions:
   - selectEntry(uid: number | null): void
-  - openAIPanel(mode: AIMode): void
+  - openAIPanel(): void                            (no mode argument — mode is decided by the caller)
   - closeAIPanel(): void
   - toggleAdvanced(): void
   - setSearch(query: string): void
   - setFilter(group: string | null, status: FilterStatus): void
   - setSort(sortBy: SortOption): void
+  - setShowDeleteConfirm(show: boolean): void
 ```
+
+> Note: `filterGroup` and `sortBy` exist in the store but are **not wired into the Sidebar UI** — only `searchQuery` and `filterStatus` are currently rendered as controls.
 
 ### 5.3 settingsStore
 
-Manages app settings. Persisted to localStorage.
+Manages app settings. Manually persisted to `localStorage["loregenius-settings"]`.
 
 ```
 State:
   - settings: AppSettings
 
 Actions:
-  - updateSettings(fields: Partial<AppSettings>): void
-  - updateAIConfig(fields: Partial<AIConfig>): void
-  - resetToDefaults(): void
-  - loadFromStorage(): void
+  - updateSettings(fields: Partial<AppSettings>): void   (auto-saves to storage)
+  - updateAIConfig(fields: Partial<AIConfig>): void      (auto-saves to storage)
+  - resetToDefaults(): void                              (auto-saves to storage)
+  - loadFromStorage(): void                              (merges stored over DEFAULT_SETTINGS)
   - saveToStorage(): void
 ```
 
 ### 5.4 aiStore
 
-Manages AI interaction state. Not persisted.
+Manages AI interaction state and contains the streaming fetch implementation. Not persisted.
 
 ```
 State:
   - isGenerating: boolean
+  - isThinking: boolean                           (set when a "reasoning"/"thinking" stream is active)
   - streamingText: string
   - error: string | null
   - abortController: AbortController | null
 
 Actions:
-  - generate(prompt: string, context: AIContext): Promise<string>
-  - stopGeneration(): void
+  - generate(prompt: string, context: AIContext, mode: AIMode): Promise<string>
+  - stopGeneration(): void                         (aborts the in-flight request)
   - clearResult(): void
 ```
+
+`generate()` reads AI config dynamically via `useSettingsStore.getState().settings.ai`, then performs a raw `fetch` to `${endpoint}/chat/completions` with `stream: true`, parsing SSE manually. It extracts content from `delta.content` / `delta.text` / `message.content` / `choice.text`, and reasoning from `reasoning_content` / `reasoning` / `thinking`. The `openai` SDK package is installed but **not currently used** by this store.
 
 ---
 
@@ -391,229 +455,108 @@ Actions:
 
 ### 6.1 Architecture
 
-The AI module (`src/lib/ai.ts`) wraps OpenAI-compatible chat completions:
+There is no separate `lib/ai.ts` or `lib/prompts.ts` file. AI streaming lives in `editorStore`'s sibling `aiStore.ts`, and the user-facing prompt is built inline in `AIPanel.tsx`:
 
 ```
-User Action → aiStore.generate() → ai.ts → fetch(endpoint/chat/completions)
-                                              ↓
-                                        Streaming response
-                                              ↓
-                                        aiStore.streamingText (reactive)
-                                              ↓
-                                        AIPanel renders tokens
-                                              ↓
-                                        User accepts → lorebookStore.updateEntry()
+User Action → AIPanel.buildPrompt() → aiStore.generate(prompt, context, "write")
+                                            ↓
+                                      aiStore → fetch(`${endpoint}/chat/completions`, { stream: true })
+                                            ↓
+                                      SSE parsed manually → streamingText + isThinking (reactive)
+                                            ↓
+                                      AIPreviewDialog renders result → Replace / Extend / Abort
+                                            ↓
+                                      On Replace/Extend → lorebookStore.updateEntry()
 ```
 
 ### 6.2 API Contract
 
-All AI calls use the OpenAI chat completions format:
-
 ```
 POST {endpoint}/chat/completions
-Authorization: Bearer {apiKey}
+Authorization: Bearer {apiKey}        (omitted if apiKey is empty)
 Content-Type: application/json
 
 {
-  "model": "{model}",
+  "model": "model || \"unknown\"",
   "messages": [
-    { "role": "system", "content": "{systemPrompt}" },
-    { "role": "user", "content": "{userPrompt}" }
+    { "role": "system", "content": "{settings.ai.systemPrompt}" },
+    { "role": "user",   "content": "{userPrompt}" }
   ],
-  "temperature": {temperature},
-  "max_tokens": {maxTokens},
+  "temperature": {settings.ai.temperature},
+  "max_tokens":  {settings.ai.maxTokens},
   "stream": true
 }
 ```
 
-### 6.3 Prompt Templates
+### 6.3 Prompt Template (Write)
 
-#### AI Write (generate from scratch)
+Only a single template ("write") is currently constructed, in `AIPanel.tsx::buildPrompt()`:
 
 ```
-System: {configured system prompt}
+{configured system prompt}
 
-User: Write a lorebook entry for the following:
+Write a lorebook entry for the following:
 
 Title/Comment: {entry.comment}
 Primary Keywords: {entry.key.join(", ")}
 Secondary Keywords: {entry.keysecondary.join(", ")}
 Group: {entry.group}
+{Current Content:\n{entry.content}   (only if entry.content is non-empty)}
 
-{customInstructions if provided}
+{Additional instructions: {customInstructions}   (only if provided)}
 
 Write concise, factual lore content suitable for injection into an AI roleplay prompt.
 Focus on key facts, relationships, and distinctive details.
 Keep it under 200 words unless the subject requires more detail.
 ```
 
-#### AI Edit (rewrite existing)
-
-```
-System: {configured system prompt}
-
-User: Rewrite and improve the following lorebook entry:
-
-Title: {entry.comment}
-Keywords: {entry.key.join(", ")}
-
-Current content:
-{entry.content}
-
-{customInstructions if provided}
-
-Improve clarity, conciseness, and detail. Maintain the same factual content.
-Return only the improved text, no explanations.
-```
-
-#### AI Expand (add detail)
-
-```
-System: {configured system prompt}
-
-User: Expand the following lorebook entry with additional detail:
-
-Title: {entry.comment}
-Keywords: {entry.key.join(", ")}
-
-Current content:
-{entry.content}
-
-{customInstructions if provided}
-
-Add relevant details while preserving all existing information.
-Return only the expanded text, no explanations.
-```
+The "expand" `AIMode` is accepted by `aiStore.generate()` but `AIPanel` always invokes the store with `"write"`. Expansion behaviour is instead handled client-side by `AIPreviewDialog`'s **Extend** button, which concatenates `${entry.content}\n\n${streamingText}`.
 
 ### 6.4 Provider Presets
 
+Configured inline in `SettingsPage.tsx::handleProviderChange`. Selecting a provider sets the endpoint:
+
 | Provider          | Default Endpoint                    | Auth Required | Notes                            |
 | ----------------- | ----------------------------------- | ------------- | -------------------------------- |
-| OpenAI Compatible | (user-defined)                      | Optional      | Generic, works with any provider |
-| LM Studio         | `http://localhost:1234/v1`          | No            | Auto-detects running instance    |
-| Ollama            | `http://localhost:11434/v1`         | No            | Auto-detects running instance    |
-| OpenAI            | `https://api.openai.com/v1`         | Yes           | Standard OpenAI API              |
-| Custom            | (user-defined)                      | Optional      | Fully manual configuration       |
+| OpenAI Compatible | `http://localhost:1234/v1`          | Optional      | Default provider; generic         |
+| LM Studio         | `http://localhost:1234/v1`          | No            | Local, auto-configures port       |
+| Ollama            | `http://localhost:11434/v1`         | No            | Local, auto-configures port       |
+| OpenAI            | `https://api.openai.com/v1`         | Yes           | Standard OpenAI API               |
+| Custom            | (current endpoint retained)        | Optional      | Fully manual configuration        |
 
 ### 6.5 Model Discovery
 
+Lives in `SettingsPage.tsx` ("Refresh Models"). Equivalent behaviour:
+
 ```typescript
-async function fetchModels(endpoint: string, apiKey: string): Promise<string[]> {
-  const response = await fetch(`${endpoint}/models`, {
-    headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
-  })
-  const data = await response.json()
-  return data.data.map((m: { id: string }) => m.id).sort()
-}
+const res = await fetch(`${ai.endpoint}/models`, {
+  headers: ai.apiKey ? { Authorization: `Bearer ${ai.apiKey}` } : {},
+})
+const data = await res.json()
+const models = data.data?.map((m: { id: string }) => m.id).sort()
 ```
+
+If no model is currently selected and models are found, the first model is auto-selected.
 
 ### 6.6 Connection Test
 
+Lives in `SettingsPage.tsx` ("Test Connection"). It reuses the model discovery call and reports:
+
 ```typescript
-async function testConnection(endpoint: string, apiKey: string): Promise<{
-  success: boolean
-  message: string
+{
+  success: boolean,
+  message: string,      // "Connected. N model(s) available." or "Could not reach endpoint."
   models?: string[]
-}> {
-  try {
-    const models = await fetchModels(endpoint, apiKey)
-    return {
-      success: true,
-      message: `Connected. ${models.length} model(s) available.`,
-      models,
-    }
-  } catch {
-    return { success: false, message: "Could not reach endpoint." }
-  }
 }
 ```
 
 ---
 
-## 7. Validation (Zod Schemas)
+## 7. Import Normalization
 
-### 7.1 Entry Schema
+> There are **no Zod schemas** anywhere in the codebase, despite `zod` being a dependency. Import does not run any schema validation pipeline; instead, loose spread-merges fill missing fields with `ENTRY_DEFAULTS` / `LOREBOOK_DEFAULTS`. There is no `min(1)` enforcement, required-field enforcement, UID-uniqueness reassignment, or duplicate-key warnings during import.
 
-```typescript
-const LorebookEntrySchema = z.object({
-  uid: z.number().int(),
-  key: z.array(z.string()).min(1, "At least one primary key is required"),
-  keysecondary: z.array(z.string()),
-  comment: z.string(),
-  content: z.string().min(1, "Content cannot be empty"),
-  constant: z.boolean(),
-  selective: z.boolean(),
-  order: z.number().int(),
-  position: z.number().int().min(0),
-  disable: z.boolean(),
-  excludeRecursion: z.boolean(),
-  probability: z.number().int().min(0).max(100),
-  useProbability: z.boolean(),
-  depth: z.number().int().min(0),
-  group: z.string(),
-  scanDepth: z.number().int().nullable(),
-  caseSensitive: z.boolean(),
-  matchWholeWords: z.boolean(),
-  automationId: z.string(),
-  role: z.number().int().min(0),
-  sticky: z.number().int().min(0),
-  cooldown: z.number().int().min(0),
-  delay: z.number().int().min(0),
-  vectorized: z.boolean(),
-})
-```
-
-### 7.2 Lorebook Schema
-
-```typescript
-const LorebookSchema = z.object({
-  entries: z.record(z.string(), LorebookEntrySchema),
-  name: z.string().min(1, "Lorebook name is required"),
-  description: z.string(),
-  scanDepth: z.number().int().min(1),
-  tokenBudget: z.number().int().min(1),
-  recursiveScanning: z.boolean(),
-  extensions: z.record(z.string(), z.unknown()),
-})
-```
-
-### 7.3 Validation Pipeline
-
-```
-Import JSON
-  → Parse JSON (syntax check)
-  → Validate against LorebookSchema (structure check)
-  → Check UID uniqueness
-  → Check for duplicate keys (warning)
-  → Estimate total tokens vs tokenBudget (warning)
-  → Return: { valid: boolean, warnings: string[], errors: string[] }
-```
-
----
-
-## 8. File Import/Export
-
-### 8.1 Import
-
-```typescript
-async function importLorebook(file: File): Promise<Lorebook> {
-  const text = await file.text()
-  const json = JSON.parse(text)
-  const result = LorebookSchema.safeParse(json)
-
-  if (!result.success) {
-    throw new ValidationError(result.error.format())
-  }
-
-  return result.data
-}
-```
-
-**Supported formats**:
-- SillyTavern lorebook JSON (primary)
-- Raw JSON with `entries` object (auto-wraps missing top-level fields with defaults)
-
-**Entry-level field migration**: When importing a lorebook, any entry fields missing from the source JSON are filled with `ENTRY_DEFAULTS` values. This ensures compatibility with older SillyTavern versions that may not include newer fields:
+`src/lib/file.ts` exposes:
 
 ```typescript
 function normalizeEntry(partial: Partial<LorebookEntry>): LorebookEntry {
@@ -621,7 +564,7 @@ function normalizeEntry(partial: Partial<LorebookEntry>): LorebookEntry {
 }
 
 function normalizeLorebook(json: unknown): Lorebook {
-  const parsed = LorebookSchema.parse(json)
+  const parsed = json as Lorebook
   const entries: Record<string, LorebookEntry> = {}
   for (const [key, entry] of Object.entries(parsed.entries)) {
     entries[key] = normalizeEntry(entry)
@@ -630,24 +573,40 @@ function normalizeLorebook(json: unknown): Lorebook {
 }
 ```
 
-This normalization runs after Zod parsing, so optional/missing fields are safely filled before the data reaches the store.
+Because this is a pure spread, any fields present in the source JSON override the defaults, and any missing fields are silently filled. Unexpected/extra fields are *preserved* (not rejected) on import; on export the entry is rebuilt from a fixed field-order list (see §8.2), so unknown keys are dropped from the exported file.
+
+---
+
+## 8. File Import/Export
+
+### 8.1 Import
+
+```typescript
+async function importLorebook(file: File, name?: string): Promise<Lorebook> {
+  const text = await file.text()
+  const json = JSON.parse(text)
+  const lorebook = normalizeLorebook(json)
+  if (name) lorebook.name = name
+  return lorebook
+}
+```
+
+**Supported formats**:
+- SillyTavern lorebook JSON (primary)
+- Raw JSON with an `entries` object (missing top-level and entry fields are filled with defaults)
 
 ### 8.2 Export
 
 ```typescript
 function exportLorebook(lorebook: Lorebook, filename: string): void {
-  const json = JSON.stringify(lorebook, null, 2)
-  const blob = new Blob([json], { type: "application/json" })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement("a")
-  a.href = url
-  a.download = `${filename}.json`
-  a.click()
-  URL.revokeObjectURL(url)
+  // 1. Sort entries by `order` ascending and write sequential displayIndex.
+  // 2. Reorder each entry's keys to a fixed ENTRY_FIELD_ORDER (42 SillyTavern fields).
+  // 3. Remove invisible control chars (\x00-\x08, \x0B, \x0C, \x0E-\x1F) from strings.
+  // 4. JSON.stringify(lorebook, null, 2) → Blob → download as `${filename}.json`.
 }
 ```
 
-**Export format**: Always produces valid SillyTavern-compatible JSON with all fields present, even if at default values. This ensures maximum compatibility.
+**Export format**: Always produces valid SillyTavern-compatible JSON with all known fields present (unknown keys are dropped by the field reordering step), even if the values are defaults. This ensures maximum compatibility.
 
 ---
 
@@ -675,7 +634,7 @@ function exportLorebook(lorebook: Lorebook, filename: string): void {
 | 11 | Settings page (AI endpoint config)   | P0       | M      |
 | 12 | AI Write (generate entry content)    | P0       | M      |
 | 13 | AI Edit (rewrite existing content)   | P0       | M      |
-| 14 | AI Expand (add detail to content)    | P1       | M      |
+| 14 | AI Expand (extend existing content)  | P1       | S      |
 | 15 | Streaming AI responses               | P1       | M      |
 | 16 | AI Chat mode                         | P2       | M      |
 | 17 | Model auto-detection                 | P1       | S      |
@@ -700,20 +659,24 @@ function exportLorebook(lorebook: Lorebook, filename: string): void {
 
 **Effort scale**: S (small, <2h), M (medium, 2-6h), L (large, 6-12h)
 
+> Current implementation status: Phase 1 core editing, import/export, themes (1–7, 9–10), AI Write + streaming + model detection + connection test + presets (11, 12, 14, 15, 17–19), keyboard shortcuts (21), token estimation (24), and draft auto-save (25) are implemented. AI Edit / Chat (13, 16), group filter/sort UI (23), drag reorder (22), context menu (27), and undo/redo (28) are **not** yet implemented despite store fields existing for some of them.
+
 ---
 
 ## 10. Key Implementation Details
 
 ### 10.1 UID Generation
 
-UIDs are monotonically increasing integers within a lorebook. On add:
+Entry UIDs are monotonically increasing integers within a lorebook, assigned by the store:
 
 ```typescript
-function getNextUid(entries: Record<string, LorebookEntry>): number {
-  const uids = Object.values(entries).map((e) => e.uid)
+function getNextUid(): number {
+  const uids = Object.values(lorebook.entries).map((e) => e.uid)
   return uids.length === 0 ? 0 : Math.max(...uids) + 1
 }
 ```
+
+`src/lib/utils.ts` also exports a `generateUid()` helper (`Date.now() + Math.floor(Math.random() * 1000)`), but it is **not used** for entry UIDs.
 
 ### 10.2 Entry Key in `entries` Object
 
@@ -724,7 +687,7 @@ The `entries` object uses stringified UIDs as keys:
 lorebook.entries["5"] = newEntry
 ```
 
-**Ordering note**: `Object.keys()` and `Object.values()` do not guarantee numeric sort order for string keys. When iterating entries in display order, always sort by the `order` field rather than relying on key insertion order:
+**Ordering note**: `Object.keys()` / `Object.values()` do not guarantee numeric sort order for string keys. When iterating entries in display order, always sort by the `order` field (this is what `lorebookStore.getEntries()` and `exportLorebook()` do):
 
 ```typescript
 function getSortedEntries(entries: Record<string, LorebookEntry>): LorebookEntry[] {
@@ -737,25 +700,19 @@ function getSortedEntries(entries: Record<string, LorebookEntry>): LorebookEntry
 When enabled, a debounced save triggers after the configured interval of inactivity. Auto-save stores a draft to localStorage (not a file download) to avoid spamming the downloads folder:
 
 ```typescript
-// Auto-save stores draft in localStorage
+// useAutoSave.ts — draft key
 localStorage.setItem("lorebook-draft", JSON.stringify(lorebook))
-
-// On app load, check for draft and offer to restore
-const draft = localStorage.getItem("lorebook-draft")
-if (draft) {
-  showRestoreDialog(JSON.parse(draft))
-}
 ```
 
-**Important**: Auto-save and explicit export are separate concepts:
-- **Auto-save** (draft): Persists work-in-progress to localStorage silently. Survives page reloads. Shown as "Draft saved" toast.
-- **Export** (file download): Triggered by Ctrl+S or the Save button. Validates the lorebook, then downloads a `.json` file to the user's machine. Shown as "Lorebook saved!" toast.
+`useAutoSave` debounces using a `setTimeout` (interval = parsed `settings.autoSave` seconds) keyed off `lorebook`/`isDirty`, and calls `markClean()` after persisting. There is currently **no "offer to restore draft" dialog** on load — the draft is written but not surfaced back to the user.
 
-The unsaved-changes indicator reflects whether the in-memory state differs from the last exported file. Auto-save does not clear this indicator.
+**Important**: Auto-save and explicit export are separate concepts:
+- **Auto-save** (draft): Persists work-in-progress to localStorage silently. Survives page reloads.
+- **Export** (file download): Triggered from the TopBar export control (a "Ctrl+S save" shortcut is registered in `useKeyboardShortcuts` but currently only calls `preventDefault()` — it does not invoke export). Downloads a `.json` file to the user's machine.
+
+The unsaved-changes indicator (`lorebookStore.isDirty`) reflects whether the in-memory state differs from the last-clean state. Auto-save calls `markClean()` and **does** clear this indicator.
 
 ### 10.4 Token Estimation
-
-Approximate token count. The app uses `gpt-tokenizer` for accurate counts when available, with a character-based heuristic as fallback:
 
 ```typescript
 import { encode } from "gpt-tokenizer"
@@ -769,13 +726,11 @@ function estimateTokens(text: string): number {
 }
 ```
 
-The heuristic fallback (`text.length / 4`) works for average English text but significantly underestimates CJK content. The `gpt-tokenizer` library uses the GPT-2/BPE vocabulary and provides counts accurate enough for budget planning.
-
-Displayed in the content editor footer and as a total across all entries in the lorebook metadata view.
+The `gpt-tokenizer` library uses the GPT-2/BPE vocabulary and provides counts accurate enough for budget planning. The heuristic fallback (`text.length / 4`) runs **only** when `encode()` throws. Displayed in the `ContentEditor` footer (gated by `settings.showTokenCount`).
 
 ### 10.5 Theme Implementation
 
-Theme is applied via a `data-theme` attribute on `<html>` and Tailwind's `dark:` variant. The `system` option uses `prefers-color-scheme` media query.
+Theme is applied by toggling a `dark` class on `<html>` (Tailwind `dark:` variant). The `system` option resolves via `matchMedia("(prefers-color-scheme: dark)")` and re-applies on change. `<html>` ships with `class="dark"` by default in `index.html` to match the default `theme: "dark"` setting.
 
 ```typescript
 function applyTheme(theme: "dark" | "light" | "system") {
@@ -789,96 +744,81 @@ function applyTheme(theme: "dark" | "light" | "system") {
 }
 ```
 
-### 10.6 Undo/Redo Limitation
+`useTheme` additionally cycles `dark → light → system → dark` via `toggleTheme()`.
 
-Undo/redo is not included in the MVP (Phase 1) or Phase 2. It is listed as a Phase 3 (P2/L) feature. This is a known UX limitation for a content editor. The mitigation strategy is:
+### 10.6 Tailwind Token Mapping (Tailwind 4)
 
-- Auto-save drafts to localStorage prevent data loss on accidental edits
-- Entry duplication before major edits serves as a manual "checkpoint"
-- Ctrl+Z browser-level undo works within text fields
-
-A future undo/redo implementation should use a command pattern with a history stack in the lorebook store, limiting depth to 50 states to manage memory.
-
-### 10.7 Tailwind Token Mapping
-
-Design color tokens from `DESIGN.md` are mapped to Tailwind via `tailwind.config.ts`:
-
-```typescript
-// tailwind.config.ts
-export default {
-  darkMode: "class",
-  theme: {
-    extend: {
-      colors: {
-        bg: {
-          primary: "var(--bg-primary)",
-          surface: "var(--bg-surface)",
-          elevated: "var(--bg-elevated)",
-          input: "var(--bg-input)",
-        },
-        border: "var(--border)",
-        text: {
-          primary: "var(--text-primary)",
-          secondary: "var(--text-secondary)",
-        },
-        accent: {
-          DEFAULT: "var(--accent)",
-          hover: "var(--accent-hover)",
-        },
-        success: "var(--success)",
-        warning: "var(--warning)",
-        danger: "var(--danger)",
-        ai: {
-          glow: "var(--ai-glow)",
-        },
-      },
-    },
-  },
-}
-```
-
-CSS custom properties are set in `globals.css` per theme, using the values from `DESIGN.md`:
+There is **no `tailwind.config.ts`**. Tailwind 4 is wired through the `@tailwindcss/vite` plugin and an `@theme inline { ... }` block in `src/styles/globals.css`, which maps flat `--color-*` names to the CSS custom properties defined for `:root` (light) and `.dark` (dark):
 
 ```css
+@import "tailwindcss";
+
+@theme inline {
+  --color-bg-primary: var(--bg-primary);
+  --color-bg-surface: var(--bg-surface);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-bg-input:   var(--bg-input);
+  --color-border:     var(--border);
+  --color-text-primary:   var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-accent:       var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger:  var(--danger);
+  --color-ai-glow: var(--ai-glow);
+}
+
 :root {
   --bg-primary: #f8f9fc;
   --bg-surface: #ffffff;
-  /* ... light theme tokens ... */
+  /* ... light theme tokens (see DESIGN.md) ... */
 }
 
 .dark {
   --bg-primary: #0f1117;
   --bg-surface: #1a1d27;
-  /* ... dark theme tokens ... */
+  /* ... dark theme tokens (see DESIGN.md) ... */
 }
 ```
+
+The token values in `globals.css` match `DESIGN.md` exactly (26 values, dark + light).
+
+### 10.7 Undo/Redo Limitation
+
+Undo/redo is not implemented. Mitigation strategy:
+- Auto-save drafts to localStorage prevent data loss on accidental edits
+- Entry duplication before major edits serves as a manual "checkpoint"
+- `Ctrl+Z` browser-level undo works within text fields
+
+A future undo/redo implementation should use a command pattern with a history stack in the lorebook store, limiting depth to 50 states to manage memory.
 
 ---
 
 ## 11. Error Handling Strategy
 
+There is no global toast system (no `toast` UI component exists). Errors are surfaced inline:
+
 | Scenario                    | Handling                                                |
 | --------------------------- | ------------------------------------------------------- |
-| Invalid JSON on import      | Error toast with parse error line/column                |
-| Schema validation failure   | Error toast listing each failed field                   |
-| AI endpoint unreachable     | Error toast + AI panel shows "Connection failed" state  |
-| AI generation error (4xx)   | Error toast with HTTP status + message                  |
-| AI generation timeout       | Auto-stop after 60s, show partial result + warning      |
-| Empty required fields       | Inline red border + helper text on save attempt         |
-| Duplicate UIDs on import    | Auto-fix by reassigning UIDs, show warning toast        |
-| localStorage quota exceeded | Warning toast, disable auto-save draft                  |
+| Invalid JSON on import      | Throws from `JSON.parse`; propagates to the import call site in `TopBar.tsx` (no user-facing toast today) |
+| Missing/extra fields on import | Silently filled by `normalizeEntry`/`normalizeLorebook`; no error shown |
+| AI endpoint unreachable / error | `aiStore.error` set; shown inline in `AIPanel`/`AIPreviewDialog` |
+| AI generation timeout       | User must press Abort (`stopGeneration()`); there is no automatic 60s timeout |
+| Connection test failure     | `connectionStatus.success=false` shown inline in `SettingsPage` |
+| localStorage quota exceeded | (Not currently handled — auto-save may throw silently) |
 
 ---
 
 ## 12. Performance Considerations
 
-| Concern                     | Mitigation                                              |
+| Concern                     | Current state                                            |
 | --------------------------- | ------------------------------------------------------- |
-| Large lorebooks (500+ entries) | Virtualized entry list (react-window or similar)     |
-| Slow AI responses           | Streaming display, abort button, 60s timeout            |
-| Large content fields        | Debounced validation (300ms), lazy token counting       |
-| Initial bundle size         | Route-based code splitting, lazy-load settings page     |
-| Re-renders on typing        | Zustand selectors with shallow equality, `useMemo`      |
+| Large lorebooks (500+ entries) | No virtualization; `Sidebar` renders all entry cards directly |
+| Slow AI responses           | Streaming display + `Abort` button (no automatic timeout) |
+| Large content fields        | Token count recomputed on every keystroke via `useEffect` (not debounced) |
+| Initial bundle size         | No route-based code splitting; `SettingsPage` is statically imported |
+| Re-renders on typing        | Zustand selectors; `useMemo` where practical |
 
 ---
 
@@ -886,10 +826,10 @@ CSS custom properties are set in `globals.css` per theme, using the values from 
 
 | Concern                     | Mitigation                                              |
 | --------------------------- | ------------------------------------------------------- |
-| API key exposure            | Stored only in localStorage, never logged or transmitted except to configured endpoint |
+| API key exposure            | Stored only in `localStorage["loregenius-settings"]`; sent only to the configured endpoint |
 | XSS via content fields      | All user content rendered as text (never `dangerouslySetInnerHTML`) |
-| Malicious JSON import       | Zod strict validation rejects unexpected fields         |
-| CORS issues with local AI   | Document that LM Studio/Ollama must enable CORS headers |
+| Malicious JSON import       | Spread-merge normalization fills known fields; unknown fields are dropped on export. **No schema rejection** of unexpected fields |
+| CORS issues with local AI  | Document that LM Studio/Ollama must enable CORS headers  |
 
 ---
 
@@ -904,12 +844,12 @@ CSS custom properties are set in `globals.css` per theme, using the values from 
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest",
-    "test:run": "vitest run"
+    "typecheck": "tsc --noEmit"
   }
 }
 ```
+
+> There is no `test`/`test:run` script and no Vitest/RTL dependency; testing infrastructure is not yet set up.
 
 ---
 
@@ -923,8 +863,8 @@ The MVP is complete when:
 4. User can export the current lorebook as valid SillyTavern JSON
 5. Exported JSON imports cleanly into SillyTavern without errors
 6. Entry list supports search and basic filtering
-7. AI Write and AI Edit work with a configured OpenAI-compatible endpoint
-8. AI panel shows streaming responses and allows accept/regenerate/discard
+7. AI Write works with a configured OpenAI-compatible endpoint
+8. AI preview shows streaming responses and allows Replace/Extend/Abort
 9. Settings page allows configuring AI endpoint, key, and model
 10. LM Studio works as a local AI provider out of the box
 11. App has a dark theme by default with light theme toggle

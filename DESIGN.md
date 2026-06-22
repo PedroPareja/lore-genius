@@ -161,7 +161,7 @@ When an entry is selected, the main area shows the full editor:
 |  |                                                    |    |
 |  |                                                    |    |
 |  +---------------------------------------------------+    |
-|  [✨ AI Write] [✨ AI Edit] [✨ AI Expand]              |
+|  [✨ AI Write]                                            |
 |                                                           |
 |  ─── Advanced Options ──────────────────────── [▼ Toggle] |
 |                                                           |
@@ -186,15 +186,12 @@ When an entry is selected, the main area shows the full editor:
 2. **Tag-style keyword input**: Keywords are chips/tags, not a comma-separated text field. Easy to add/remove individual keywords. Enter or comma adds a new chip; click X on chip removes it.
 
 3. **Content editor**: Multi-line textarea with:
-   - Line numbers
    - Character/word/token count display (bottom-right)
-   - Approximate token count estimation (based on ~4 chars/token)
-   - Markdown preview toggle: switches the textarea to a read-only rendered markdown view; toggle again returns to edit mode. Unsaved edits are preserved across toggles.
+   - Token count estimation via `gpt-tokenizer` (with a `chars / 4` fallback only if the tokenizer throws)
+   - Preview toggle: switches the textarea to a read-only view of the raw content; toggle again returns to edit mode. Unsaved edits are preserved across toggles.
 
-4. **AI assist buttons** below content:
-   - **AI Write**: Generate content from scratch given the comment/title and keywords as context
-   - **AI Edit**: AI rewrites/polishes the current content
-   - **AI Expand**: AI adds more detail to existing content
+4. **AI assist button** below content:
+   - **AI Write**: Generate content from the comment/title and keywords (with the current content, if any, provided as context) using the AI Assistant Panel (see 4.5). After streaming completes, a preview dialog lets the user **Replace** (overwrite content) or **Extend** (append to content).
    - Each opens the AI Assistant Panel (see 4.5)
 
 5. **Inline validation**: Required fields (key, content) show red border + helper text if empty on save attempt.
@@ -237,7 +234,7 @@ Slides in from the right (400px wide) when an AI action is triggered:
 +----------------------------------+
 |                                  |
 |  Mode: [Write ▼]                |
-|  (Write / Edit / Expand / Chat) |
+|  (Write / Expand)               |
 |                                  |
 |  Context (auto-filled):          |
 |  - Entry: "Arasaka Corporation" |
@@ -254,7 +251,7 @@ Slides in from the right (400px wide) when an AI action is triggered:
 |  Arasaka Corporation is a       |
 |  Japanese megacorporation...    |
 |                                  |
-|  [Accept] [Regenerate] [Discard]|
+|  [Replace] [Extend] [Abort]     |
 |                                  |
 +----------------------------------+
 ```
@@ -264,17 +261,15 @@ Slides in from the right (400px wide) when an AI action is triggered:
 | Mode       | Behavior                                                             |
 | ---------- | -------------------------------------------------------------------- |
 | Write      | Generates content from scratch using entry comment + keys as prompt  |
-| Edit       | Takes current content + instruction, returns improved version        |
-| Expand     | Takes current content, adds detail while preserving existing text    |
-| Chat       | Freeform conversation with AI about the entry; paste result manually |
+| Expand     | Appends generated detail to the entry's existing content            |
 
 **Flow**:
 1. User clicks an AI button on the entry editor
 2. Panel slides in, pre-filled with context from current entry
 3. User can add custom instructions (optional)
 4. Click Generate → streaming response appears
-5. User chooses: Accept (replaces content), Regenerate, or Discard
-6. On Accept, content is placed in the editor (still unsaved — user must save explicitly)
+5. User chooses: Replace (overwrites content), Extend (appends to content), or Abort (stop generation)
+6. On Replace/Extend, content is placed in the editor (still unsaved — user must save explicitly)
 
 **Streaming**: AI responses stream token-by-token with a typing animation. A "Stop" button appears during generation.
 
@@ -548,14 +543,14 @@ On screens < 768px, the AI assistant panel becomes a full-screen overlay:
 |  Arasaka Corporation is a       |
 |  Japanese megacorporation...    |
 |                                  |
-|  [Accept] [Regenerate] [Discard]|
+|  [Replace] [Extend] [Abort]     |
 |                                  |
 +----------------------------------+
 ```
 
 - Slides up from bottom (250ms ease-out)
 - "← Back" returns to entry editor
-- On Accept, panel closes and content populates the editor
+- On Replace/Extend, panel closes and content populates the editor
 
 ---
 

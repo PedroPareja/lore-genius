@@ -8,11 +8,11 @@ Fully client-side — no backend, no accounts. All data lives in your browser an
 
 - **Full lorebook editor** — all SillyTavern entry fields supported (keys, content, position, role, group, probability, sticky, cooldown, and more)
 - **Import/export** — import existing SillyTavern lorebook JSON; export valid files that work in SillyTavern without modification
-- **AI-assisted writing** — generate, edit, or expand entry content using any OpenAI-compatible endpoint (LM Studio, Ollama, OpenAI, or custom)
-- **Streaming responses** — AI text streams in real-time; accept, regenerate, or discard results
+- **AI-assisted writing** — generate or expand entry content using any OpenAI-compatible endpoint (OpenAI-compatible, LM Studio, Ollama, OpenAI, or custom)
+- **Streaming responses** — AI text streams in real-time; replace or extend entry content with the result
 - **Token counting** — accurate token estimation using GPT tokenizer with character-heuristic fallback
 - **Dark-first UI** — dark theme by default with light mode toggle
-- **Keyboard shortcuts** — `Ctrl+S` save, `Ctrl+N` new entry, `Ctrl+G` AI panel, and more
+- **Keyboard shortcuts** — `Ctrl+N` new entry, `Ctrl+G` AI panel, `Ctrl+D` duplicate, `Ctrl+Shift+A` AI write, and more
 - **Responsive layout** — works on desktop and tablet; mobile-friendly sidebar/panel flow
 
 ## Tech Stack
@@ -75,6 +75,7 @@ LoreGenius works with any OpenAI-compatible API:
 
 | Provider | Endpoint | Auth |
 |---|---|---|
+| OpenAI Compatible | `http://localhost:1234/v1` | None |
 | LM Studio | `http://localhost:1234/v1` | None |
 | Ollama | `http://localhost:11434/v1` | None |
 | OpenAI | `https://api.openai.com/v1` | API key required |
