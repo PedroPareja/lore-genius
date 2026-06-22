@@ -33,7 +33,7 @@
 
 The app is fully client-side. AI API calls are made directly from the browser to the configured endpoint. No server, no database, no user accounts. All data lives in:
 
-- **localStorage**: App settings (key `loregenius-settings`) and auto-save drafts (key `lorebook-draft`)
+- **localStorage**: App settings (key `loregenius-settings`), auto-save drafts (key `lorebook-draft`), and character templates (key `loregenius-templates`)
 - **File system**: JSON files imported/exported by the user
 
 ---
@@ -70,8 +70,18 @@ lore-genius-3/
 │   │   │   ├── AIResult.tsx        # Streaming result display
 │   │   │   └── index.ts
 │   │   │
+│   │   ├── agent/                   # AI Lorebook Generator (Phase 4)
+│   │   │   ├── AILorebookWizard.tsx # Configuration form + progress panel + live log
+│   │   │   ├── AgentProgressPanel.tsx # Right-side step checklist + token counter + Stop
+│   │   │   └── index.ts
+│   │   │
+│   │   ├── templates/               # Character Templates manager (Phase 4)
+│   │   │   ├── TemplatesManager.tsx # List view + create/edit/delete + import/export
+│   │   │   ├── TemplateEditor.tsx   # Inline dialog form (name + data)
+│   │   │   └── index.ts
+│   │   │
 │   │   ├── settings/
-│   │   │   ├── SettingsPage.tsx    # Full settings view (AI config, behaviour, app prefs, LM Studio test)
+│   │   │   ├── SettingsPage.tsx    # Full settings view (AI config incl. maxContextSize, behaviour, app prefs, LM Studio test)
 │   │   │   └── index.ts
 │   │   │
 │   │   └── ui/                     # shadcn/ui primitives
@@ -95,6 +105,8 @@ lore-genius-3/
 │   │   ├── editorStore.ts          # Editor UI state (selected entry, panels, filters). Not persisted.
 │   │   ├── settingsStore.ts        # App settings. Manually persisted to localStorage.
 │   │   ├── aiStore.ts              # AI interaction state + streaming fetch implementation. Not persisted.
+│   │   ├── templatesStore.ts       # Character templates. Manually persisted to localStorage. (Phase 4)
+│   │   ├── agentStore.ts           # Transient agent state for AI Lorebook Generator. Not persisted. (Phase 4)
 │   │   └── index.ts
 │   │
 │   ├── lib/
@@ -102,10 +114,13 @@ lore-genius-3/
 │   │   ├── file.ts                 # JSON import/export (normalize, order fields, sanitize, download)
 │   │   ├── tokenizer.ts            # estimateTokens() via gpt-tokenizer
 │   │   ├── utils.ts                # cn(), truncate(), generateUid()
+│   │   ├── personality.ts          # rollPersonality(), formatPersonality(), PERSONALITY_AREAS (Phase 4)
+│   │   ├── templateFile.ts         # Character Templates JSON spec import/export + zod schema (Phase 4)
+│   │   ├── agent.ts                # AI Lorebook Generator runner (plan/concepts/user/characters) (Phase 4)
 │   │   └── (no ai.ts / prompts.ts / validation.ts / uid.ts — see sections 6 & 7)
 │   │
 │   ├── hooks/
-│   │   ├── useKeyboardShortcuts.ts # Global shortcut registration
+│   │   ├── useKeyboardShortcuts.ts # Global shortcut registration (incl. Ctrl+Shift+N / Ctrl+Shift+P)
 │   │   ├── useAutoSave.ts          # Debounced draft auto-save to localStorage
 │   │   ├── useTheme.ts             # Theme application + cycling toggle
 │   │   └── index.ts
@@ -114,6 +129,9 @@ lore-genius-3/
 │   │   ├── lorebook.ts             # Lorebook / LorebookEntry types, EntryPosition / EntryRole
 │   │   ├── ai.ts                   # AIConfig / AIProvider / AIMode / AIContext
 │   │   ├── settings.ts             # AppSettings / Theme / AutoSaveInterval
+│   │   ├── templates.ts            # CharacterTemplate type (Phase 4)
+│   │   ├── personality.ts          # PersonalityProfile / PersonalityTrait / PersonalityBucket (Phase 4)
+│   │   ├── agent.ts                # AILorebookRequest / AgentPlan / AgentStep (Phase 4)
 │   │   └── index.ts
 │   │
 │   └── styles/
@@ -276,6 +294,7 @@ interface AIConfig {
   systemPrompt: string
   temperature: number
   maxTokens: number
+  maxContextSize: number
 }
 
 type AIProvider =
@@ -308,6 +327,7 @@ const DEFAULT_AI_CONFIG: AIConfig = {
     "You are a creative writing assistant specializing in worldbuilding and lore creation for roleplay. Write concise, factual, and evocative lore entries.",
   temperature: 0.7,
   maxTokens: 1024,
+  maxContextSize: 32768,
 }
 ```
 
@@ -354,11 +374,106 @@ interface EditorState {
 }
 ```
 
+### 4.8 Character Template
+
+A character template is a reusable base the AI Lorebook Generator draws from when creating character entries. Templates are managed in their own screen and persisted in `localStorage` (bulk-export/import via JSON file).
+
+```typescript
+interface CharacterTemplate {
+  id: string                       // stable uuid (generateUid())
+  name: string                     // character/template name (unique within the collection)
+  data: string                     // free-form text: appearance, bio, fixed traits, quirks, role…
+  createdAt: number                // epoch ms
+  updatedAt: number                // epoch ms
+}
+```
+
+**Constraints**:
+- `name` is unique within the local collection (used as the merge key on import).
+- `data` is opaque to the app; only the AI agent reads it.
+- A single AI Lorebook generation run uses each template **at most once** (no repeats within the same lorebook).
+
+### 4.9 Personality Profile
+
+The output of the pure-local Random Personality tool (`lib/personality.ts`).
+
+```typescript
+type PersonalityBucket =
+  | "Very Low" | "Low" | "Moderate-Low" | "Moderate"
+  | "Moderate-High" | "High" | "Very High"
+
+interface PersonalityTrait {
+  area: string                  // one of PERSONALITY_AREAS
+  value: number                 // 0–100
+  bucket: PersonalityBucket
+}
+
+interface PersonalityProfile {
+  seed: string                 // deterministic seed used (or "" if random)
+  traits: PersonalityTrait[]   // 30 entries, one per area
+}
+
+const PERSONALITY_AREAS: string[] = [
+  "Friendliness", "Honesty", "Confidence", "Agreeableness", "Manners",
+  "Discipline", "Rebelliousness", "Loyalty", "Emotional Capacity", "Intelligence",
+  "Positivity", "Activity Level", "Social Tendency", "Courage", "Patience",
+  "Creativity", "Humor", "Generosity", "Trust", "Ambition", "Stress Response",
+  // extended areas
+  "Curiosity", "Empathy", "Independence", "Adaptability", "Energy",
+  "Sensitivity", "Perseverance", "Self-Control", "Playfulness",
+]
+```
+
+API (`lib/personality.ts`):
+
+```typescript
+function rollPersonality(seed?: string): PersonalityProfile
+function formatPersonality(profile: PersonalityProfile): string   // text block for appends/prompts
+function bucketFor(value: number): PersonalityBucket
+```
+
+`rollPersonality` is deterministic given a seed (a simple seeded PRNG such as `mulberry32` with a hashed seed) and uniformly random when no seed is supplied.
+
+### 4.10 AI Lorebook Generation Request
+
+The input bundle the wizard assembles before invoking the agent:
+
+```typescript
+interface AILorebookRequest {
+  worldIdea: string               // required — the seed description
+  lorebookName: string            // required
+  targetCharacterCount: number    // required — N characters to generate
+  generateConcepts: boolean       // if false, skip concept entries
+  templateIds?: string[]           // optional; subset of CharacterTemplate ids to draw from.
+                                   // If absent or fewer than targetCharacterCount, the
+                                   // agent falls back to in-app templates or random base templates.
+  extraInstructions?: string       // optional tone / content guidance
+  includeUserPersona: boolean      // default true — produces the {{user}} entry
+}
+
+type AgentStepStatus = "pending" | "running" | "done" | "aborted" | "error"
+
+interface AgentStep {
+  id: string                       // "plan" | "concept:handmaid" | "user" | "char:June Osborne" …
+  label: string
+  status: AgentStepStatus
+  tokensUsed?: number
+}
+
+interface AgentPlan {
+  userPersonaSummary: string
+  concepts: { keyword: string; role: string }[]
+  characters: { templateId: string; templateName: string; name: string; role: string }[]
+}
+```
+
+The agent writes the resulting lorebook via `lorebookStore.createNewLorebook` + `addEntry`/`updateEntry`, then it becomes the active lorebook in the editor. The plan object is transient (in-memory only) and surfaced via the live log.
+
 ---
 
 ## 5. State Management (Zustand Stores)
 
-All four stores use `create()` from `zustand`. **None use the `persist` middleware** — persistence is performed manually (settings via `localStorage["loregenius-settings"]`, drafts via `localStorage["lorebook-draft"]`).
+All five stores use `create()` from `zustand`. **None use the `persist` middleware** — persistence is performed manually (settings via `localStorage["loregenius-settings"]`, drafts via `localStorage["lorebook-draft"]`, templates via `localStorage["loregenius-templates"]`).
 
 ### 5.1 lorebookStore
 
@@ -448,6 +563,54 @@ Actions:
 ```
 
 `generate()` reads AI config dynamically via `useSettingsStore.getState().settings.ai`, then performs a raw `fetch` to `${endpoint}/chat/completions` with `stream: true`, parsing SSE manually. It extracts content from `delta.content` / `delta.text` / `message.content` / `choice.text`, and reasoning from `reasoning_content` / `reasoning` / `thinking`. The `openai` SDK package is installed but **not currently used** by this store.
+
+### 5.5 templatesStore
+
+Manages the local collection of Character Templates. Manually persisted to `localStorage["loregenius-templates"]`.
+
+```
+State:
+  - templates: CharacterTemplate[]
+  - isDirty: boolean                     (true if modified since last export/import/load)
+
+Actions:
+  - loadFromStorage(): void              (merges stored over an empty collection)
+  - saveToStorage(): void
+  - addTemplate(name: string, data: string): string            (returns new id; validates unique name)
+  - updateTemplate(id: string, fields: Partial<Pick<CharacterTemplate, "name" | "data">>): void
+  - deleteTemplate(id: string): void
+  - getTemplate(id: string): CharacterTemplate | undefined
+  - getAll(): CharacterTemplate[]
+  - importFromFile(file: File): Promise<{ added: number; overwritten: number }>   (merge by name)
+  - exportToFile(filename?: string): void                                          (download bulk JSON)
+  - markClean(): void
+```
+
+### 5.6 agentStore
+
+Manages the AI Lorebook Generator (agent mode). Transient (not persisted).
+
+```
+State:
+  - request: AILorebookRequest | null
+  - phase: "idle" | "planning" | "concepts" | "characters" | "done" | "error" | "aborted"
+  - plan: AgentPlan | null
+  - steps: AgentStep[]
+  - log: string[]                       (live, append-only)
+  - tokensUsed: number
+  - isRunning: boolean
+  - error: string | null
+  - abortController: AbortController | null
+
+Actions:
+  - start(request: AILorebookRequest): Promise<void>   (runs the agent; resolves once done/aborted/error)
+  - stop(): void                                        (aborts the run; phase → "aborted")
+  - reset(): void                                       (clears everything, phase → "idle")
+  - appendLog(line: string): void
+  - updateStep(id: string, patch: Partial<AgentStep>): void
+```
+
+The agent itself lives in `lib/agent.ts` (see §6.7). `agentStore` only holds UI-facing state; the runner calls its setters as it progresses. On `done`, the runner creates the lorebook via `lorebookStore` so the main editor displays it immediately.
 
 ---
 
@@ -550,6 +713,58 @@ Lives in `SettingsPage.tsx` ("Test Connection"). It reuses the model discovery c
 }
 ```
 
+### 6.7 AI Lorebook Generator (Agent Mode)
+
+The generator lives in `lib/agent.ts` and reuses `aiStore.generate()` for each AI call. It is orchestrated by `agentStore` (see §5.6).
+
+**Runner pipeline** (`runAgent(request, hooks)` where `hooks` are `agentStore` setters):
+
+1. **Plan** (single AI call, JSON-only output):
+   - Input: `request.worldIdea`, `targetCharacterCount`, `generateConcepts`, the chosen character templates (names + data), and `extraInstructions`.
+   - Output: `AgentPlan` (a JSON object) with:
+     - `userPersonaSummary` — a short paragraph describing `{{user}}` in that world.
+     - `concepts[]` — `{ keyword, role }` pairs (only if `generateConcepts`).
+     - `characters[]` — `{ templateId, templateName, name, role }` pairs, exactly `targetCharacterCount` items, each referencing a **distinct** template.
+   - The model is asked to return strict JSON (parsed with `JSON.parse`; on failure the run aborts with `error`).
+
+2. **Concepts** (optional, one AI call per concept OR batched):
+   - For each planned concept, an entry is created with `key = [keyword]`, `comment = keyword`, group `"concepts"`, `position = 0` (Before Char Def), `constant = false`.
+   - Content is the AI-generated short description (~50–100 words).
+
+3. **`{{user}}` entry** (single AI call if `includeUserPersona`):
+   - `key = ["{{user}}"]`, `comment = "{{user}}"`, group `"persona"`, `constant = true` (so it is always loaded), `position = 0`.
+   - Content: persona description built from `userPersonaSummary`, expanded into role/status/starting situation.
+
+4. **Characters** (one AI call per character, to keep each response focused and within `maxTokens`):
+   - Before the call, a `PersonalityProfile` is rolled via `rollPersonality()` (seeded by character name for reproducibility). The formatted profile is included in the prompt as "inspiration; you may override individual traits if the template or world coherence requires it. If a template defines a fixed trait, the template prevails."
+   - Primary keywords: the distinct words of the character's name **plus** relevant role/job terms produced by the planner (e.g. role "handmaid" for June Osborne). Filtered to remove stopwords and duplicates.
+   - `comment = name`, group `"characters"`, `position = 1` (After Char Def).
+   - Content sections (always present): **Appearance / Physical Description**, **Personality**, **Bio**, **Motivations & Struggles**. The template's `data` is injected as immutable base material.
+
+5. **Context budget / splitting**:
+   - `aiStore.generate()` already sends `max_tokens = settings.ai.maxTokens` per call. The agent additionally consults `settings.ai.maxContextSize` to estimate whether all characters can be generated in one pass. Because each character is its own call, the per-call context is bounded by `maxTokens`; `maxContextSize` is used to:
+     - Decide whether to re-feed previously generated character entries as context for the next character (to keep names/world consistent). If the cumulative token count of prior entries exceeds `maxContextSize - headroom`, prior entries are summarised/truncated rather than passed verbatim.
+     - Surface a live "Tokens used: X / Y" counter in the progress panel.
+
+6. **Commit & display**:
+   - On success, `lorebookStore.createNewLorebook(request.lorebookName)` is called once, then entries are added in order (concepts → user → characters).
+   - The first entry (or `{{user}}`) is selected in the editor; the user lands on the main editor screen ready to review/edit/export.
+   - A toast summarises "Lorebook created: N characters, M concepts".
+
+7. **Abort**:
+   - `agentStore.stop()` calls `abortController.abort()`. The runner catches the `AbortError`, sets `phase = "aborted"`, and **does not** create any lorebook (no partial commits). The UI shows the abort confirmation dialog before stopping.
+
+**No tools/function-calling API required**: the agent is implemented as a sequential pipeline of plain `/chat/completions` calls with carefully constructed prompts. The "Random Personality tool" is a local function, not an AI tool/function — it is called directly by the runner and the result embedded in the prompt text.
+
+### 6.8 Max Context Size
+
+`AIConfig.maxContextSize` (default `32768`) is:
+
+- Set in the Settings page (number input, min `1024`, step `512`).
+- Read by the agent runner (see §6.7 step 5) for context-budget decisions.
+- Used by the wizard UI to show an estimate of feasible character count (e.g. `Math.floor((maxContextSize - systemPromptTokens - conceptTokens) / perCharacterTokens)`).
+- Independent from `maxTokens` (the per-response cap). `maxContextSize` is the model's input+output budget; `maxTokens` is the output portion per call.
+
 ---
 
 ## 7. Import Normalization
@@ -608,6 +823,42 @@ function exportLorebook(lorebook: Lorebook, filename: string): void {
 
 **Export format**: Always produces valid SillyTavern-compatible JSON with all known fields present (unknown keys are dropped by the field reordering step), even if the values are defaults. This ensures maximum compatibility.
 
+### 8.3 Character Templates JSON Spec
+
+Bulk import/export format for the Character Templates manager. The file is a single JSON object with a `schemaVersion` and a `templates` array.
+
+```jsonc
+{
+  "schemaVersion": 1,
+  "exportedAt": 1719062400000,          // epoch ms, optional on import
+  "templates": [
+    {
+      "name": "Arasaka Executive",
+      "data": "Appearance: ...\nBio: ...\nFixed traits: ...",
+      "createdAt": 1719062400000,        // optional on import (defaults to now)
+      "updatedAt": 1719062400000         // optional on import (defaults to now)
+    }
+  ]
+}
+```
+
+**Rules**:
+
+- `schemaVersion` is required and must be `1`. Future versions will migrate forward.
+- Each template in `templates` requires `name` (non-empty, unique within the file) and `data` (string, may be empty).
+- `id` is **not** included in the file; the importer generates fresh ids and merges by `name`. A name collision with an existing local template prompts the user to **Overwrite** or **Skip** (see DESIGN.md §11 confirmation).
+- `createdAt` / `updatedAt` are optional on import; missing values default to `Date.now()`.
+- Unknown fields inside a template object are dropped on import (strict shape).
+
+**Export function** (`lib/templateFile.ts`):
+
+```typescript
+function exportTemplates(templates: CharacterTemplate[], filename = "character-templates"): void
+async function importTemplates(file: File): Promise<{ templates: Omit<CharacterTemplate, "id">[]; schemaVersion: number }>
+```
+
+**Validation**: Uses a small `zod` schema (`templateFileSchema`) — the first use of `zod` in the codebase. On invalid files, a toast with the first zod error path/message is shown and nothing is imported.
+
 ---
 
 ## 9. Feature Breakdown
@@ -660,6 +911,26 @@ function exportLorebook(lorebook: Lorebook, filename: string): void {
 **Effort scale**: S (small, <2h), M (medium, 2-6h), L (large, 6-12h)
 
 > Current implementation status: Phase 1 core editing, import/export, themes (1–7, 9–10), AI Write + streaming + model detection + connection test + presets (11, 12, 14, 15, 17–19), keyboard shortcuts (21), token estimation (24), and draft auto-save (25) are implemented. AI Edit / Chat (13, 16), group filter/sort UI (23), drag reorder (22), context menu (27), and undo/redo (28) are **not** yet implemented despite store fields existing for some of them.
+
+### Phase 4: AI Lorebook Generation & Character Templates
+
+| #  | Feature                                    | Priority | Effort |
+| -- | ------------------------------------------ | -------- | ------ |
+| 31 | `maxContextSize` in AI Config (Settings)   | P0       | S      |
+| 32 | Random Personality tool (`lib/personality.ts`) | P0   | S      |
+| 33 | "Random Personality" button in Entry Editor | P0      | S      |
+| 34 | Character Template data model + templatesStore | P0   | M      |
+| 35 | Character Templates manager screen (CRUD)  | P0       | M      |
+| 36 | Character Templates JSON spec + bulk import/export (zod) | P0 | M |
+| 37 | Unsaved-templates warning banner           | P1       | S      |
+| 38 | AILorebookRequest/AgentPlan/AgentStep types | P0      | S      |
+| 39 | agentStore (transient agent state)         | P0       | M      |
+| 40 | `lib/agent.ts` runner (plan → concepts → user → characters) | P0 | L |
+| 41 | AI Lorebook Generator wizard UI            | P0       | L      |
+| 42 | "AI Lorebook" top-bar button + navigation | P0       | S      |
+| 43 | Context-budget splitting by `maxContextSize` | P1     | M      |
+| 44 | Abort flow (no partial commit)            | P0       | S      |
+| 45 | Keyboard shortcuts (`Ctrl+Shift+N`, `Ctrl+Shift+P`) | P1 | S |
 
 ---
 
@@ -869,3 +1140,20 @@ The MVP is complete when:
 10. LM Studio works as a local AI provider out of the box
 11. App has a dark theme by default with light theme toggle
 12. App is responsive and usable on desktop (primary) and tablet (secondary)
+
+### Phase 4 — AI Lorebook Generation & Character Templates
+
+The Phase 4 features are complete when:
+
+13. Settings page exposes `maxContextSize` and it is persisted and read by the agent runner
+14. "Random Personality" button in the Entry Editor appends a deterministic 30-area personality profile to entry content (no AI call)
+15. Character Templates manager supports create / edit / delete and persists to `localStorage["loregenius-templates"]`
+16. Character Templates can be bulk-imported and bulk-exported via the JSON spec (§8.3), with zod validation and name-collision confirmation
+17. An unsaved-templates warning banner is shown when templates have local changes that have not been exported
+18. "AI Lorebook" button opens a wizard; supplying a world idea, name and target character count starts the agent
+19. The agent produces a lorebook with an `{{user}}` entry, optional concept entries, and exactly N character entries — each based on a **distinct** template
+20. Each character entry's primary keywords include the name's distinct words plus a relevant role/job term
+21. Each character entry contains appearance, personality, bio, and motivations & struggles; the rolled personality inspires but may be overridden; template fixed traits prevail over the roll
+22. The agent respects `maxContextSize`, splitting/re-summarising context when needed
+23. Aborting the agent leaves no partial lorebook; on completion the new lorebook is loaded into the main editor and is editable/exportable
+24. Keyboard shortcuts `Ctrl+Shift+N` (AI wizard) and `Ctrl+Shift+P` (random personality) work

@@ -70,20 +70,22 @@ All semantic token names remain the same between themes; only the values change.
 
 ```
 +----------------------------------------------------------+
-| [Logo] LoreGenius    [Lorebook Name]   [Theme] [Settings]|
+| [Logo] LoreGenius  [LB Name] [New][AI LB][Import][Export]|
 +----------+-----------------------------------------------+
 |          |                                               |
 | SIDEBAR  |              MAIN CONTENT                     |
 |          |                                               |
 | Entries  |   (changes per view — see below)              |
-| List     |                                               |
-|          |                                               |
+| List     |   (editor / settings / AI lorebook wizard /   |
+|          |    character templates manager)                |
 | [Search] |                                               |
 | [Filter] |                                               |
 | [+ New]  |                                               |
 |          |                                               |
 +----------+-----------------------------------------------+
 ```
+
+The top bar exposes lorebook-level actions: **New** (empty lorebook), **AI Lorebook** (open the AI generation wizard — see 4.8), **Import**, **Export**, **Templates** (open Character Templates manager — see 4.7), theme toggle, and settings.
 
 - **Sidebar**: Fixed 280px width, collapsible to 60px (icon-only mode) via drag or toggle
 - **Main content**: Fluid, min-width 600px
@@ -161,7 +163,7 @@ When an entry is selected, the main area shows the full editor:
 |  |                                                    |    |
 |  |                                                    |    |
 |  +---------------------------------------------------+    |
-|  [✨ AI Write]                                            |
+|  [✨ AI Write]  [Random Personality]                        |
 |                                                           |
 |  ─── Advanced Options ──────────────────────── [▼ Toggle] |
 |                                                           |
@@ -193,6 +195,7 @@ When an entry is selected, the main area shows the full editor:
 4. **AI assist button** below content:
    - **AI Write**: Generate content from the comment/title and keywords (with the current content, if any, provided as context) using the AI Assistant Panel (see 4.5). After streaming completes, a preview dialog lets the user **Replace** (overwrite content) or **Extend** (append to content).
    - Each opens the AI Assistant Panel (see 4.5)
+   - **Random Personality**: Generates a randomized personality profile (see 4.9) and **appends** it to the current entry content. Useful as raw material the AI can later refine via AI Write/Expand. No AI call is made — the profile is computed locally and inserted as formatted text so the user can edit/delete it freely.
 
 5. **Inline validation**: Required fields (key, content) show red border + helper text if empty on save attempt.
 
@@ -302,6 +305,7 @@ Full-page view, accessible from top bar gear icon:
 |                                                           |
 |  Temperature      [0.7 ───●─── 1.0]                      |
 |  Max Tokens       [1024 ▼]                                |
+|  Max Context Size [32768 ▼]                                |
 |                                                           |
 |  ── App Preferences ──────────────────────────────────────|
 |                                                           |
@@ -341,6 +345,198 @@ Full-page view, accessible from top bar gear icon:
 
 5. **API Key security**: Key is stored in localStorage (never sent anywhere except the configured endpoint). Masked by default with show/hide toggle.
 
+6. **Max Context Size**: The maximum context window (in tokens) the configured model can accept. Used by the **AI Lorebook Generator** to budget how many characters/concepts can be generated in a single agent run and to decide whether to split generation across multiple sequential requests. Defaults to `32768`. A helper hint shows the estimated number of characters achievable within the budget (e.g. "~20 characters @ 1500 tokens each").
+
+### 4.7 Character Templates Manager
+
+Full-page view, accessible from the top-bar **Templates** button:
+
+```
++-----------------------------------------------------------+
+|  ← Back         Character Templates                         |
++-----------------------------------------------------------+
+|                                                           |
+|  [+ New Template]     [Import JSON]   [Export JSON]        |
+|   ! "You have unsaved templates. Export them to a JSON file to avoid losing them."
+|                                                           |
+|  ── Templates ────────────────────────────────────────── |
+|                                                           |
+|  ⠿ ● Arasaka Exec            [Edit] [Delete]              |
+|    "Ruthless corporate executive with a hidden past"      |
+|  ⠿ ● Netrunner               [Edit] [Delete]              |
+|    "Brilliant hacker haunted by their last run"           |
+|  ⠿ ● Street Samurai          [Edit] [Delete]              |
+|    "Cybernetically-enhanced mercenary"                    |
+|                                                           |
++-----------------------------------------------------------+
+```
+
+The **Templates** list shows one card per template:
+
+| Element        | Details                                                    |
+| -------------- | ---------------------------------------------------------- |
+| Drag handle    | `⠿` reorder handle (optional, controls export order)      |
+| Status dot     | Green = saved, Blue = unsaved changes                      |
+| Name           | Character/template name (bold)                            |
+| Data preview   | First 80 chars of `data`, dimmed                          |
+| Actions        | Edit (opens template editor), Delete (with confirmation)  |
+
+**Template Editor** (inline dialog or full-page form):
+
+```
++-----------------------------------------------------------+
+|  Edit Character Template                                   |
++-----------------------------------------------------------+
+|                                                           |
+|  Name *                                                    |
+|  [Arasaka Executive_____________________]                 |
+|                                                           |
+|  Data                                                      |
+|  +---------------------------------------------------+    |
+|  | Appearance: Tall, sharp features, always in a     |    |
+|  | tailored suit. Cybernetic left eye.                |    |
+|  |                                                    |    |
+|  | Bio: Born into poverty, clawed their way up...     |    |
+|  |                                                    |    |
+|  | Fixed traits: Cold, calculating. Allergic to      |    |
+|  | emp jelly. Hates being touched.                    |    |
+|  +---------------------------------------------------+    |
+|                                                           |
+|  [Save]  [Cancel]                                          |
++-----------------------------------------------------------+
+```
+
+**Key UX decisions**:
+
+1. **Two fields only**: Each character template has `name` (string) and `data` (free-form string). The `data` blob can include appearance, bio, fixed personality traits, quirks, kind of job — any text the AI should treat as immutable base material when generating the corresponding character.
+
+2. **Bulk import/export**: `Export JSON` downloads all templates as a single file using the Character Templates JSON spec (see SPECS.md §X). `Import JSON` accepts a file conforming to that spec and merges/overwrites templates by `name` (with a confirmation dialog if names collide). Individual templates cannot be exported (only bulk).
+
+3. **Unsaved-data warning**: If any template has been added or modified since the last export/import/load, a non-blocking warning banner ("! You have unsaved templates. Export them to a JSON file to avoid losing them.") is shown. Templates live only in `localStorage` between sessions; no automatic file is written.
+
+4. **Navigation**: The "← Back" button returns to the previous screen (main editor or empty-state). The Templates manager is reachable both when a lorebook is open and from the empty state.
+
+5. **Used-in-lorebook indicator (optional, future)**: When generating an AI Lorebook, templates selected for the run are temporarily marked "in use" to prevent double-use within the same lorebook (see 4.8).
+
+### 4.8 AI Lorebook Generator (Agent Mode)
+
+Opened from the top-bar **AI Lorebook** button. Slides in as a full-page wizard (replacing the main content area) with a progress panel on the right:
+
+```
++-----------------------------------------------------------+
+|  ← Back         AI Lorebook Generator                      |
++-----------------------------------------------------------+----------------------------------+
+|  Configuration                                             |  Generation Progress             |
+|                                                            |                                 |
+|  World idea / concept description *                        |  ● Analyzing world idea…      ✓ |
+|  +---------------------------------------------------+    |  ● Generating concepts…      ✓ |
+|  | A totalitarian theocracy where women are          |    ○ Generating {{user}}…        |
+|  | reduced to reproductive vessels...                 |    ○ Generating character 1/N…  |
+|  |                                                    |    ○ Generating character 2/N…  |
+|  +---------------------------------------------------+    |                                 |
+|                                                            |  Tokens used: 4,200 / 32768     |
+|  Lorebook name *                                           |                                 |
+|  [The Handmaid's Tale_____________________]              |  [Stop]                         |
+|                                                            |                                 |
+|  Target number of characters *  [8 ▼]                     |  ── Live log ──────────────── |
+|  Generate concepts?           ☑ Yes                       |  > concept "handmaid": A woman |
+|  Character templates JSON     [Choose file…]               |      assigned to bear children… |
+|   (optional — leave empty to use random base templates)   |  > concept "Gilead": The nation |
+|                                                            |  > character "June Osborne"…     |
+|  Extra instructions (optional)                             |                                 |
+|  [Set a somber, literary tone; include… ]                  |                                 |
+|                                                            |                                 |
+|  [✨ Generate Lorebook]                                     |                                 |
++-----------------------------------------------------------+----------------------------------+
+```
+
+**Configuration fields**:
+
+| Field                       | Required | Purpose                                                            |
+| --------------------------- | -------- | ----------------------------------------------------------------- |
+| World idea / concept        | Yes      | Free-form description of the world to build (the seed)            |
+| Lorebook name               | Yes      | Name of the resulting lorebook                                     |
+| Target number of characters | Yes      | How many character entries to generate (≤ available templates)   |
+| Generate concepts?          | No       | If checked, AI also produces concept entries (keywords for world) |
+| Character templates JSON    | No       | Bulk-imported templates to draw from; falls back to in-app templates if empty |
+| Extra instructions          | No       | Additional guidance for tone, themes, content restrictions         |
+
+**Generation agent flow**:
+
+1. **Plan**: the agent builds an outline (`{{user}}` persona, list of concept keywords, list of N characters each assigned a unique template) *without* writing full entries. This plan is streamed into the live log and can be aborted before content generation.
+2. **Concepts** (optional): for each planned concept, the agent produces a concept entry (keyword + short description). E.g. for *The Handmaid's Tale*: `handmaid`, `commander`, `eye`, `wife`, `Gilead`, `women rights`.
+3. **`{{user}}` entry**: a singleton entry keyed `{{user}}` describing the user persona in that world (role, status, starting situation). Constant flag often enabled.
+4. **Characters**: one entry per planned character, each:
+   - Based on a **unique character template** (each template used at most once per lorebook).
+   - Primary keywords = the distinct words of the character's name **plus** relevant role/job terms (e.g. for "June Osborne" → `June`, `Osborne`, `handmaid`; for "Arasaka Executive" → `Arasaka`, `Executive`, `CEO`).
+   - Content includes a full **appearance/physical description**, **personality**, **bio**, and **motivations & struggles**. The personality is inspired by a freshly rolled **Random Personality** profile (see 4.9), but the AI may override specific traits if a template's fixed traits or world coherence demand it. Where a random trait contradicts an established template trait, **the template wins**.
+5. **Budget management**: the agent respects `settings.ai.maxContextSize` (see 4.6). If the planned work would exceed the budget, it splits generation across multiple sequential requests, re-feeding previously generated entries as context so names/world stay consistent.
+6. **Result**: a new lorebook is created, loaded into the main editor, and displayed — user can immediately review/edit/export it. A summary toast reports characters and concepts created. The original wizard state is discarded.
+
+The progress panel is a read-only log; the user cannot edit during generation. The **Stop** button aborts the agent mid-run; partial entries are not committed (the user is told the lorebook was not created).
+
+**Non-AI local helper — Random Personality**: the agent calls a local, deterministic-by-seed function (no AI) to roll a personality profile for each character before asking the AI to write the character. This keeps randomness cheap and reproducible. See 4.9.
+
+### 4.9 Random Personality Tool
+
+A pure-local function (`lib/personality.ts`) that returns a randomized personality profile. It is **not** AI-generated — it is cheap, instant, and deterministic given a seed. The output is a structured object rendered as a formatted text block for both the manual button (4.3) and the AI agent (4.8).
+
+**Personality areas** (the final list, reviewed and extended):
+
+| # | Area                  |
+| - | --------------------- |
+| 1 | Friendliness          |
+| 2 | Honesty               |
+| 3 | Confidence            |
+| 4 | Agreeableness         |
+| 5 | Manners               |
+| 6 | Discipline            |
+| 7 | Rebelliousness        |
+| 8 | Loyalty               |
+| 9 | Emotional Capacity    |
+| 10 | Intelligence           |
+| 11 | Positivity             |
+| 12 | Activity Level         |
+| 13 | Social Tendency       |
+| 14 | Courage               |
+| 15 | Patience              |
+| 16 | Creativity            |
+| 17 | Humor                 |
+| 18 | Generosity            |
+| 19 | Trust                 |
+| 20 | Ambition              |
+| 21 | Stress Response       |
+| 22 | Curiosity              |
+| 23 | Empathy                |
+| 24 | Independence           |
+| 25 | Adaptability           |
+| 26 | Energy                 |
+| 27 | Sensitivity            |
+| 28 | Perseverance           |
+| 29 | Self-Control           |
+| 30 | Playfulness            |
+
+> Extended from the original 20 with: Loyalty, Curiosity, Empathy, Independence, Adaptability, Energy, Sensitivity, Perseverance, Self-Control, Playfulness. The list is data-driven (`PERSONALITY_AREAS`) so further additions are trivial and need no code changes.
+
+**Output format** (appended to entry content / fed to the agent):
+
+```
+[Random Personality]
+Friendliness:    Low (25)
+Honesty:          High (80)
+Confidence:       Moderate (55)
+Agreeableness:    Low (20)
+Manners:          High (90)
+Discipline:       Very High (95)
+Rebelliousness:   Very Low (5)
+Loyalty:          High (85)
+Emotional Capacity: Moderate (50)
+Intelligence:     Very High (92)
+...
+```
+
+Each area gets a numeric value 0–100 plus a verbal bucket (Very Low / Low / Moderate-Low / Moderate / Moderate-High / High / Very High) tuned to feel meaningful for character writing. The function exposes `rollPersonality(seed?: string): PersonalityProfile`.
+
 ---
 
 ## 5. Interaction Flows
@@ -364,6 +560,46 @@ User clicks [Import] in top bar
   → If valid: lorebook loads into app
   → If invalid: error toast with specific validation issue
   → User can now edit entries
+```
+
+### 5.2b Generate AI Lorebook (Agent Mode)
+
+```
+User clicks [AI Lorebook] in top bar
+  → Wizard opens (4.8) in main content area
+  → User fills world idea, name, target character count, optional templates JSON
+  → User clicks [✨ Generate Lorebook]
+  → Agent:
+      1. Plans (user persona, concepts, N characters bound to unique templates)
+      2. (Optional) generates concept entries
+      3. Creates {{user}} entry
+      4. For each character: rolls a Random Personality, asks AI to write
+         appearance + personality + bio + motivations, template traits win on conflict
+      5. Respects maxContextSize, splits across requests if needed
+  → Progress + live log shown in right panel; [Stop] can abort
+  → On completion: new lorebook created in lorebookStore and shown in main editor
+  → Toast: "Lorebook created: N characters, M concepts"
+  → User can review, edit, export
+```
+
+### 5.2c Random Personality (manual)
+
+```
+User opens an entry in the editor
+  → Clicks [Random Personality] under the content textarea (4.3)
+  → A fresh personality profile is computed locally and appended to content
+  → Entry remains unsaved (user can edit/delete the appended block)
+  → Optional: pair with [✨ AI Write] + custom instructions to "incorporate the appended personality profile into a coherent character description"
+```
+
+### 5.2d Manage Character Templates
+
+```
+User clicks [Templates] in top bar
+  → Character Templates Manager opens (4.7)
+  → If templates have unsaved changes, warning banner is shown
+  → User can: create, edit, delete, bulk-import JSON, bulk-export JSON
+  → [← Back] returns to previous screen
 ```
 
 ### 5.3 Create New Entry
@@ -429,6 +665,8 @@ On mobile:
 - Selecting an entry navigates to the editor view
 - Back button returns to list
 - AI panel is full-screen overlay
+- **AI Lorebook Wizard** becomes single-column: configuration form on top, progress panel collapses below (or as a collapsible accordion). Live log scrolls independently.
+- **Character Templates Manager** becomes single-column: template cards stack vertically; template editor opens as a full-screen dialog.
 
 ---
 
@@ -439,10 +677,12 @@ On mobile:
 | `Ctrl+S`         | Save/Export lorebook       |
 | `Ctrl+N`         | New entry                  |
 | `Ctrl+I`         | Import lorebook            |
+| `Ctrl+Shift+N`   | AI Lorebook generator (wizard) |
 | `Ctrl+F`         | Focus search in sidebar    |
 | `Ctrl+G`         | Toggle AI panel            |
 | `Ctrl+.`         | Toggle settings            |
 | `Ctrl+Shift+A`   | AI Write (current entry)   |
+| `Ctrl+Shift+P`   | Random Personality (append to current entry) |
 | `Delete`         | Delete selected entry      |
 | `Ctrl+D`         | Duplicate selected entry   |
 | `Arrow Up/Down`  | Navigate entries in list   |
@@ -459,6 +699,8 @@ On mobile:
 | No search results  | "No entries match your search"                   |
 | AI disconnected    | "Configure an AI endpoint in Settings to enable AI features" |
 | No models found    | "No models available at this endpoint"           |
+| No character templates | "No templates yet. Create one or import a JSON file to get started" |
+| AI lorebook wizard — no templates available | "No character templates available. Import a JSON file or create templates in the Templates manager; random base templates will be used if none are provided" |
 
 ---
 
@@ -500,6 +742,10 @@ All destructive actions require explicit confirmation via a modal dialog:
 | Reset settings to defaults | Reset Settings?      | "All settings will be restored to their defaults."   | Red "Reset"    |
 | Discard AI result          | Discard Result?      | "The generated text will be lost."                   | "Discard"      |
 | Navigate away with unsaved | Unsaved Changes      | "You have unsaved changes. Discard them?"            | "Discard"      |
+| Delete character template   | Delete Template?     | "Are you sure you want to delete '{template.name}'?" | Red "Delete"   |
+| Overwrite templates on import | Templates will be overwritten | "Importing will overwrite N existing template(s) with the same name. Continue?" | "Overwrite" |
+| Abort AI lorebook generation | Abort Generation?    | "Stopping now will discard all generated entries. The lorebook will not be created." | "Abort"      |
+| Generate AI lorebook with unsaved current lorebook | Replace Current Lorebook? | "Generating a new AI lorebook will replace the currently open lorebook. Unsaved changes will be lost. Continue?" | "Continue"  |
 
 Dialogs use the shadcn/ui `Dialog` component with a backdrop. The destructive action button is visually prominent (danger color). "Cancel" is the default focus.
 
@@ -510,6 +756,7 @@ Dialogs use the shadcn/ui `Dialog` component with a backdrop. The destructive ac
 | Context                    | Indicator                                                    |
 | -------------------------- | ------------------------------------------------------------ |
 | AI connecting/generating   | Streaming text with blinking cursor + "Stop" button          |
+| AI lorebook generating    | Right-side progress panel with step checklist, live log, token counter + "Stop" button |
 | Lorebook file parsing      | Spinner overlay on main content area (< 1s expected)         |
 | Model list fetching        | Inline spinner next to model dropdown + "Loading models..."  |
 | Connection test            | Spinner replacing "Test Connection" button text              |
