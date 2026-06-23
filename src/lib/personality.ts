@@ -43,7 +43,7 @@ export function rollPersonality(seedStr?: string): PersonalityProfile {
 }
 
 export function formatPersonality(profile: PersonalityProfile): string {
-  const lines = ["[Random Personality]"]
+  const lines = ["[Personality]"]
   for (const trait of profile.traits) {
     lines.push(`${trait.area}: ${trait.bucket} (${trait.value})`)
   }

@@ -521,7 +521,7 @@ A pure-local function (`lib/personality.ts`) that returns a randomized personali
 **Output format** (appended to entry content / fed to the agent):
 
 ```
-[Random Personality]
+[Personality]
 Friendliness:    Low (25)
 Honesty:          High (80)
 Confidence:       Moderate (55)
