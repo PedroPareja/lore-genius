@@ -55,7 +55,7 @@ export function Sidebar() {
   const [showFilters, setShowFilters] = useState(false)
 
   const entries = useMemo(() => {
-    let result = getEntries()
+    let result = lorebook ? getEntries() : []
 
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
@@ -77,7 +77,8 @@ export function Sidebar() {
     }
 
     return result
-  }, [getEntries, searchQuery, filterStatus])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lorebook, searchQuery, filterStatus])
 
   const handleNewEntry = () => {
     const uid = addEntry()
